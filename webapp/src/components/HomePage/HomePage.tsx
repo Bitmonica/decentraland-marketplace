@@ -1,17 +1,28 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
+import { Page } from 'decentraland-ui'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
-import { isMobile } from 'decentraland-dapps/dist/lib/utils'
-import { Page, Hero, Button } from 'decentraland-ui'
+import { getAnalytics } from 'decentraland-dapps/dist/modules/analytics/utils'
 import { locations } from '../../modules/routing/locations'
 import { VendorName } from '../../modules/vendor/types'
-import { SortBy } from '../../modules/routing/types'
+import { BrowseOptions, SortBy } from '../../modules/routing/types'
 import { View } from '../../modules/ui/types'
 import { AssetType } from '../../modules/asset/types'
 import { HomepageView } from '../../modules/ui/asset/homepage/types'
 import { Section } from '../../modules/vendor/decentraland/routing/types'
+import { Navigation } from '../Navigation'
+import { NavigationTab } from '../Navigation/Navigation.types'
 import { Navbar } from '../Navbar'
+import { RecentlySoldTable } from '../RecentlySoldTable'
 import { Footer } from '../Footer'
+import { AnalyticsVolumeDayData } from '../AnalyticsVolumeDayData'
+import { CampaignBanner } from '../Campaign/CampaignBanner'
 import { Slideshow } from './Slideshow'
+import { RankingsTable } from '../RankingsTable'
+import { BackToTopButton } from '../BackToTopButton'
+import { ListsLaunchModal } from '../Modals/ListsLaunchModal'
+import HandsCategoryLaunchModal from '../Modals/FTU/HandsCategoryLaunchModal'
+import { SmartWearablesLaunchModal } from '../Modals/FTU/SmartWearablesLaunchModal'
+import { CampaignHomepageBanner } from '../Campaign/banners/CampaignHomepageBanner'
 import { Props } from './HomePage.types'
 import './HomePage.css'
 
@@ -20,13 +31,16 @@ const HomePage = (props: Props) => {
     homepage,
     homepageLoading,
     onNavigate,
-    onFetchAssetsFromRoute
+    onFetchAssetsFromRoute,
+    isCampaignHomepageBannerEnabled
   } = props
+
+  const vendor = VendorName.DECENTRALAND
 
   const sections: Partial<Record<View, Section>> = useMemo(
     () => ({
+      [View.HOME_TRENDING_ITEMS]: Section.WEARABLES_TRENDING,
       [View.HOME_NEW_ITEMS]: Section.WEARABLES,
-      [View.HOME_SOLD_ITEMS]: Section.WEARABLES,
       [View.HOME_WEARABLES]: Section.WEARABLES,
       [View.HOME_LAND]: Section.LAND,
       [View.HOME_ENS]: Section.ENS
@@ -34,8 +48,24 @@ const HomePage = (props: Props) => {
     []
   )
 
+  const sectionsSubtitles: Partial<Record<View, string>> = useMemo(
+    () => ({
+      [View.HOME_TRENDING_ITEMS]: t('home_page.home_trending_items_subtitle'),
+      [View.HOME_WEARABLES]: t('home_page.home_recently_listed_items_subtitle')
+    }),
+    []
+  )
+
+  const sectionsViewAllTitle: Partial<Record<View, string>> = useMemo(
+    () => ({
+      [View.HOME_TRENDING_ITEMS]: t('home_page.home_trending_items_explore_all')
+    }),
+    []
+  )
+
   const assetTypes: Partial<Record<View, AssetType>> = useMemo(
     () => ({
+      [View.HOME_TRENDING_ITEMS]: AssetType.ITEM,
       [View.HOME_NEW_ITEMS]: AssetType.ITEM,
       [View.HOME_SOLD_ITEMS]: AssetType.ITEM,
       [View.HOME_WEARABLES]: AssetType.NFT,
@@ -56,80 +86,151 @@ const HomePage = (props: Props) => {
     []
   )
 
-  const handleGetStarted = useCallback(() => {
-    onNavigate(
-      locations.browse({
-        section: Section.WEARABLES,
-        assetType: AssetType.ITEM
-      })
-    )
-  }, [onNavigate])
-
   const handleViewAll = useCallback(
-    (view: View) => {
+    (view: View, fromEmptyState: boolean = false) => {
       const section = sections[view]
       const assetType = assetTypes[view]
       const sortBy = sort[view]
 
+      let trackMessage: string = ''
+      let browseOptions: BrowseOptions = {}
+
       if (Section.LAND === section) {
         onNavigate(locations.lands())
+      } else if (Section.WEARABLES_TRENDING === section) {
+        trackMessage = 'Explore all trending wearables'
+        browseOptions = {
+          section: Section.WEARABLES,
+          assetType: AssetType.ITEM
+        }
       } else {
-        onNavigate(locations.browse({ section, assetType, sortBy }))
+        trackMessage = `View all ${section} section`
+        browseOptions = { section, assetType, sortBy }
+      }
+
+      if (trackMessage && browseOptions) {
+        getAnalytics().track(
+          fromEmptyState ? `${trackMessage} '(from empty state)'` : trackMessage
+        )
+        onNavigate(locations.browse(browseOptions))
       }
     },
-    [sections, assetTypes, sort, onNavigate]
+    [assetTypes, sort, sections, onNavigate]
   )
 
-  const vendor = VendorName.DECENTRALAND
+  const fetchAssetsForView = useCallback(
+    (view: View, section?: Section) =>
+      onFetchAssetsFromRoute({
+        vendor,
+        section: section || sections[view],
+        view,
+        assetType: assetTypes[view],
+        sortBy: sort[view],
+        page: 1,
+        onlyOnSale: true
+      }),
+    [onFetchAssetsFromRoute, vendor, sections, assetTypes, sort]
+  )
+
+  const sectionsEmptyMessages: Partial<Record<View, string>> = useMemo(
+    () => ({
+      [View.HOME_TRENDING_ITEMS]: t(
+        'home_page.home_trending_items_empty_message',
+        {
+          br: <br />,
+          try_again_link: (
+            <div
+              className="empty-state-action-button"
+              onClick={() => fetchAssetsForView(View.HOME_TRENDING_ITEMS)}
+            >
+              {t('home_page.home_trending_items_try_again')}
+            </div>
+          ),
+          explore_all_link: (
+            <div
+              className="empty-state-action-button"
+              onClick={() => handleViewAll(View.HOME_TRENDING_ITEMS)}
+            >
+              {t('home_page.home_trending_items_explore_all_wearables')}
+            </div>
+          )
+        }
+      )
+    }),
+    [fetchAssetsForView, handleViewAll]
+  )
+
+  const handleOnChangeItemSection = useCallback(
+    (view: HomepageView, section: Section) => {
+      sections[view] = section
+      fetchAssetsForView(view, section)
+    },
+    [sections, fetchAssetsForView]
+  )
 
   useEffect(() => {
     let view: HomepageView
     for (view in homepage) {
-      const assetType = assetTypes[view]
-      const section = sections[view]
-      const sortBy = sort[view]
-      onFetchAssetsFromRoute({
-        vendor,
-        section,
-        view,
-        assetType,
-        sortBy,
-        page: 1,
-        onlyOnSale: true
-      })
+      fetchAssetsForView(view)
     }
     // eslint-disable-next-line
-  }, [onFetchAssetsFromRoute])
+  }, [fetchAssetsForView])
 
-  const views = Object.keys(homepage) as HomepageView[]
+  const renderSlideshow = (view: HomepageView) => {
+    const hasItemsSection =
+      view === View.HOME_NEW_ITEMS || view === View.HOME_WEARABLES
+
+    return (
+      <Slideshow
+        key={view}
+        view={view}
+        title={t(`home_page.${view}`)}
+        subtitle={sectionsSubtitles[view]}
+        viewAllTitle={sectionsViewAllTitle[view]}
+        emptyMessage={sectionsEmptyMessages[view]}
+        assets={homepageLoading[view] ? [] : homepage[view]}
+        hasItemsSection={hasItemsSection}
+        isLoading={homepageLoading[view]}
+        onViewAll={() => handleViewAll(view)}
+        onChangeItemSection={
+          hasItemsSection ? handleOnChangeItemSection : undefined
+        }
+      />
+    )
+  }
+
+  const homepageWithoutLatestSales = Object.keys(homepage).filter(
+    view => view !== View.HOME_SOLD_ITEMS
+  )
+  // trending and newest sections
+  const firstViewsSection = homepageWithoutLatestSales.splice(
+    0,
+    2
+  ) as HomepageView[]
+  // rest of the sections
+  const secondViewsSection = homepageWithoutLatestSales as HomepageView[]
 
   return (
     <>
-      <Navbar isFullscreen isOverlay />
-      <Hero centered={isMobile()} className="HomePageHero">
-        <Hero.Header>{t('home_page.title')}</Hero.Header>
-        <Hero.Description>{t('home_page.subtitle')}</Hero.Description>
-        <Hero.Content>
-          <div className="hero-image" />{' '}
-        </Hero.Content>
-        <Hero.Actions>
-          <Button primary onClick={handleGetStarted}>
-            {t('home_page.get_started')}
-          </Button>
-        </Hero.Actions>
-      </Hero>
+      <Navbar isFullscreen />
+      <Navigation activeTab={NavigationTab.OVERVIEW} />
+      <ListsLaunchModal />
+      <HandsCategoryLaunchModal />
+      <SmartWearablesLaunchModal />
+      {isCampaignHomepageBannerEnabled ? (
+        <CampaignBanner>
+          <CampaignHomepageBanner />
+        </CampaignBanner>
+      ) : null}
       <Page className="HomePage">
-        {views.map(view => (
-          <Slideshow
-            key={view}
-            title={t(`home_page.${view}`)}
-            assets={homepage[view]}
-            isLoading={homepageLoading[view]}
-            onViewAll={() => handleViewAll(view)}
-          />
-        ))}
+        <AnalyticsVolumeDayData />
+        {firstViewsSection.map(renderSlideshow)}
+        <RankingsTable />
+        {secondViewsSection.map(renderSlideshow)}
+        <RecentlySoldTable />
       </Page>
       <Footer />
+      <BackToTopButton />
     </>
   )
 }

@@ -1,5 +1,7 @@
 import { call, takeEvery, put, select } from '@redux-saga/core/effects'
-import { fetchItemsRequest } from '../item/actions'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { isErrorWithMessage } from '../../lib/error'
+import { fetchCollectionItemsRequest } from '../item/actions'
 import { getItemsByContractAddress } from '../item/selectors'
 import { collectionAPI } from '../vendor/decentraland'
 import { CollectionResponse } from '../vendor/decentraland/collection/types'
@@ -45,18 +47,20 @@ export function* handleFetchCollectionsRequest(
 
         if (!items || items.length !== collection.size) {
           yield put(
-            fetchItemsRequest({
-              filters: {
-                first: collection.size,
-                contractAddress: collection.contractAddress
-              }
+            fetchCollectionItemsRequest({
+              first: collection.size,
+              contractAddresses: [collection.contractAddress]
             })
           )
         }
       }
     }
   } catch (error) {
-    yield put(fetchCollectionsFailure(error.message))
+    yield put(
+      fetchCollectionsFailure(
+        isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+      )
+    )
   }
 }
 
@@ -82,8 +86,6 @@ export function* handleFetchSingleCollectionRequest(
 
     const [collection] = collections
 
-    yield put(fetchSingleCollectionSuccess(collection))
-
     if (shouldFetchItems) {
       const itemsByContractAddress: ReturnType<typeof getItemsByContractAddress> = yield select(
         getItemsByContractAddress
@@ -93,16 +95,19 @@ export function* handleFetchSingleCollectionRequest(
 
       if (!items || items.length !== collection.size) {
         yield put(
-          fetchItemsRequest({
-            filters: {
-              first: collection.size,
-              contractAddress: collection.contractAddress
-            }
+          fetchCollectionItemsRequest({
+            first: collection.size,
+            contractAddresses: [collection.contractAddress]
           })
         )
       }
     }
+    yield put(fetchSingleCollectionSuccess(collection))
   } catch (error) {
-    yield put(fetchSingleCollectionFailure(error.message))
+    yield put(
+      fetchSingleCollectionFailure(
+        isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+      )
+    )
   }
 }

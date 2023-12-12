@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from 'react'
-import { utils } from 'ethers'
+import { ethers } from 'ethers'
 import { Link } from 'react-router-dom'
 import { Loader, Stats, Button } from 'decentraland-ui'
-import { Profile } from 'decentraland-dapps/dist/containers'
 import { T, t } from 'decentraland-dapps/dist/modules/translation/utils'
 import { locations } from '../../modules/routing/locations'
 import { addressEquals } from '../../modules/wallet/utils'
 import { AssetType } from '../../modules/asset/types'
 import { AssetProvider } from '../AssetProvider'
+import { LinkedProfile } from '../LinkedProfile'
 import { AssetImage } from '../AssetImage'
 import { Mana } from '../Mana'
 import { AcceptButton } from './AcceptButton'
@@ -53,7 +53,7 @@ const Bid = (props: Props) => {
                 contractAddress={bid.contractAddress}
                 tokenId={bid.tokenId}
               >
-                {(nft, isLoading) => (
+                {(nft, _order, _rental, isLoading) => (
                   <>
                     {!nft && isLoading ? <Loader active /> : null}
                     {nft ? (
@@ -71,12 +71,12 @@ const Bid = (props: Props) => {
           <div className="wrapper">
             <div className="info">
               <Stats className="from" title={t('bid.from')}>
-                <Link to={locations.account(bid.bidder)}>
-                  <Profile address={bid.bidder} />
-                </Link>
+                <LinkedProfile address={bid.bidder} />
               </Stats>
               <Stats className="price" title={t('bid.price')}>
-                <Mana network={bid.network}>{formatWeiMANA(bid.price)}</Mana>
+                <Mana showTooltip network={bid.network}>
+                  {formatWeiMANA(bid.price)}
+                </Mana>
               </Stats>
               <Stats title={t('bid.time_left')}>
                 {formatDistanceToNow(+bid.expiresAt)}
@@ -101,9 +101,11 @@ const Bid = (props: Props) => {
                       contractAddress={bid.contractAddress}
                       tokenId={bid.tokenId}
                     >
-                      {nft => (
+                      {(nft, _order, rental) => (
                         <AcceptButton
+                          userAddress={wallet.address}
                           nft={nft}
+                          rental={rental}
                           bid={bid}
                           onClick={handleAccept}
                         />
@@ -155,7 +157,7 @@ const Bid = (props: Props) => {
                       values={{
                         name: <b>{getAssetName(nft)}</b>,
                         amount: (
-                          <Mana network={nft.network} inline>
+                          <Mana showTooltip network={nft.network} inline>
                             {formatWeiMANA(bid.price)}
                           </Mana>
                         )
@@ -166,7 +168,7 @@ const Bid = (props: Props) => {
                   </>
                 }
                 onConfirm={handleConfirm}
-                valueToConfirm={utils.formatEther(bid.price)}
+                valueToConfirm={ethers.utils.formatEther(bid.price)}
                 network={nft.network}
                 onCancel={() => setShowConfirmationModal(false)}
                 loading={isAcceptingBid}

@@ -1,18 +1,36 @@
-import { Order } from '@dcl/schemas'
+import { Order, RentalListing } from '@dcl/schemas'
+import { BaseClientConfig } from 'decentraland-dapps/dist/lib/BaseClient'
 import { Wallet } from 'decentraland-dapps/dist/modules/wallet/types'
 import { sendTransaction } from 'decentraland-dapps/dist/modules/wallet/utils'
 import { NFT, NFTsFetchParams, NFTsCountParams } from '../../nft/types'
 import { Account } from '../../account/types'
 import { NFTService as NFTServiceInterface } from '../services'
+import { FetchOneOptions, VendorName } from '../types'
 import { NFTsFetchFilters } from './nft/types'
-import { VendorName } from '../types'
-import { nftAPI } from './nft/api'
+import { NFT_SERVER_URL } from './nft/api'
+import { NFTAuthAPI } from './nft/authApi'
 import { getERC721ContractData } from './utils'
 
 export class NFTService
   implements NFTServiceInterface<VendorName.DECENTRALAND> {
-  async fetch(params: NFTsFetchParams, filters?: NFTsFetchFilters) {
-    const { data: results, total } = await nftAPI.fetch(params, filters)
+  nftAPI: NFTAuthAPI
+
+  constructor(config?: BaseClientConfig | undefined) {
+    this.nftAPI = new NFTAuthAPI(NFT_SERVER_URL, config)
+  }
+  async fetch(
+    params: NFTsFetchParams,
+    filters?: NFTsFetchFilters
+  ): Promise<
+    readonly [
+      NFT<VendorName.DECENTRALAND>[],
+      Account[],
+      Order[],
+      RentalListing[],
+      number
+    ]
+  > {
+    const { data: results, total } = await this.nftAPI.get(params, filters)
 
     const accounts: Account[] = results.reduce((accumulator, nftResult) => {
       const address = nftResult.nft.owner
@@ -34,21 +52,35 @@ export class NFTService
       .filter(nftResult => nftResult.order)
       .map(nftResult => nftResult.order as Order)
 
-    return [nfts, accounts, orders, total] as const
+    const rentals: RentalListing[] = results
+      .filter(nftResult => nftResult.rental)
+      .map(nftResult => nftResult.rental as RentalListing)
+
+    return [nfts, accounts, orders, rentals, total]
   }
 
   async count(countParams: NFTsCountParams, filters?: NFTsFetchFilters) {
-    const result = await nftAPI.fetch(
+    const result = await this.nftAPI.get(
       { ...countParams, first: 0, skip: 0 },
       filters
     )
     return result.total
   }
 
-  async fetchOne(contractAddress: string, tokenId: string) {
-    const response = await nftAPI.fetchOne(contractAddress, tokenId)
+  async fetchOne(
+    contractAddress: string,
+    tokenId: string,
+    options?: FetchOneOptions
+  ): Promise<
+    readonly [NFT<VendorName.DECENTRALAND>, Order | null, RentalListing | null]
+  > {
+    const response = await this.nftAPI.fetchOne(
+      contractAddress,
+      tokenId,
+      options
+    )
     const nft: NFT = { ...response.nft, vendor: VendorName.DECENTRALAND }
-    return [nft, response.order || undefined] as const
+    return [nft, response.order, response.rental]
   }
 
   async transfer(wallet: Wallet | null, to: string, nft: NFT) {
@@ -58,8 +90,12 @@ export class NFTService
 
     const contract = getERC721ContractData(nft)
 
-    return sendTransaction(contract, erc721 =>
-      erc721.transferFrom(wallet.address, to, nft.tokenId)
+    return sendTransaction(
+      contract,
+      'transferFrom',
+      wallet.address,
+      to,
+      nft.tokenId
     )
   }
 

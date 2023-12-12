@@ -8,6 +8,9 @@ import { transactionReducer as transaction } from 'decentraland-dapps/dist/modul
 import { profileReducer as profile } from 'decentraland-dapps/dist/modules/profile/reducer'
 import { authorizationReducer as authorization } from 'decentraland-dapps/dist/modules/authorization/reducer'
 import { toastReducer as toast } from 'decentraland-dapps/dist/modules/toast/reducer'
+import { featuresReducer as features } from 'decentraland-dapps/dist/modules/features/reducer'
+import { modalReducer as modal } from 'decentraland-dapps/dist/modules/modal/reducer'
+import { gatewayReducer as gateway } from 'decentraland-dapps/dist/modules/gateway/reducer'
 
 import { accountReducer as account } from './account/reducer'
 import { bidReducer as bid } from './bid/reducer'
@@ -22,15 +25,23 @@ import { collectionReducer as collection } from './collection/reducer'
 import { storeReducer as store } from './store/reducer'
 import { saleReducer as sale } from './sale/reducer'
 import { identityReducer as identity } from './identity/reducer'
+import { analyticsReducer as analytics } from './analytics/reducer'
+import { rentalReducer as rental } from './rental/reducer'
+import { eventReducer as event } from './event/reducer'
+import { contractReducer as contract } from './contract/reducer'
+import { favoritesReducer as favorites } from './favorites/reducer'
+import { assetReducer as asset } from './asset/reducer'
 
 export const createRootReducer = (history: History) =>
   combineReducers({
+    asset,
     account,
     authorization,
     bid,
     item,
     nft,
     order,
+    rental,
     profile,
     proximity,
     routing,
@@ -45,7 +56,14 @@ export const createRootReducer = (history: History) =>
     collection,
     store,
     sale,
-    identity
+    identity,
+    analytics,
+    features,
+    event,
+    modal,
+    contract,
+    gateway,
+    favorites
   })
 
 export type RootState = ReturnType<ReturnType<typeof createRootReducer>>

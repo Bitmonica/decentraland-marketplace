@@ -1,18 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { LazyImage } from 'react-lazy-images'
+import { LazyLoadImage } from 'react-lazy-load-image-component'
 import classNames from 'classnames'
-import { BodyShape, NFTCategory, PreviewEmote, Rarity } from '@dcl/schemas'
+import { Env } from '@dcl/ui-env'
+import {
+  BodyShape,
+  NFTCategory,
+  Network,
+  PreviewEmote,
+  PreviewType,
+  Rarity
+} from '@dcl/schemas'
 import { T, t } from 'decentraland-dapps/dist/modules/translation/utils'
 import { getAnalytics } from 'decentraland-dapps/dist/modules/analytics/utils'
-import { Button, Center, Loader, Popup, WearablePreview } from 'decentraland-ui'
-
-import { getAssetImage, getAssetName } from '../../modules/asset/utils'
+import {
+  Badge,
+  Button,
+  Center,
+  Icon,
+  Loader,
+  Popup,
+  WearablePreview
+} from 'decentraland-ui'
+import { getAssetImage, getAssetName, isNFT } from '../../modules/asset/utils'
 import { getSelection, getCenter } from '../../modules/nft/estate/utils'
-import { Atlas } from '../Atlas'
-import { Props } from './AssetImage.types'
-import './AssetImage.css'
+import * as events from '../../utils/events'
+import { isLegacyOrder } from '../../lib/orders'
 import { config } from '../../config'
-import { Env } from '@dcl/ui-env'
+import { getSmartWearableVideoShowcase } from '../../lib/asset'
+import { Atlas } from '../Atlas'
+import ListedBadge from '../ListedBadge'
+import { Coordinate } from '../Coordinate'
+import WarningBadge from '../WarningBadge'
+import { JumpIn } from '../AssetPage/JumpIn'
+import { getEthereumItemUrn } from './utils'
+import { ControlOptionAction, Props } from './AssetImage.types'
+import AvailableForMintPopup from './AvailableForMintPopup'
+import './AssetImage.css'
 
 // 1x1 transparent pixel
 const PIXEL =
@@ -56,8 +79,17 @@ const AssetImage = (props: Props) => {
     isSmall,
     showMonospace,
     avatar,
+    wearableController,
     isTryingOn,
-    onSetIsTryingOn
+    isPlayingEmote,
+    onSetIsTryingOn,
+    onSetWearablePreviewController,
+    onPlaySmartWearableVideoShowcase,
+    children,
+    hasBadges,
+    item,
+    wallet,
+    videoHash
   } = props
   const { parcel, estate, wearable, emote, ens } = asset.data
 
@@ -65,10 +97,18 @@ const AssetImage = (props: Props) => {
     isDraggable
   )
   const [wearablePreviewError, setWearablePreviewError] = useState(false)
+  const [isSoundEnabled, setIsSoundEnabled] = useState(false)
+  const [hasSound, setHasSound] = useState<boolean | undefined>(undefined)
   const handleLoad = useCallback(() => {
     setIsLoadingWearablePreview(false)
     setWearablePreviewError(false)
-  }, [])
+    if (asset.category === NFTCategory.EMOTE && !wearableController) {
+      onSetWearablePreviewController(
+        WearablePreview.createController('wearable-preview')
+      )
+    }
+  }, [asset.category, wearableController, onSetWearablePreviewController])
+
   const handleError = useCallback(error => {
     console.warn(error)
     setWearablePreviewError(true)
@@ -86,12 +126,78 @@ const AssetImage = (props: Props) => {
       setIsLoadingWearablePreview(true)
     }
   }, [isTryingOn, onSetIsTryingOn])
+  const handleControlActionChange = useCallback(
+    async (action: ControlOptionAction) => {
+      const ZOOM_DELTA = 0.03
+
+      if (
+        ControlOptionAction.PLAY_SMART_WEARABLE_VIDEO_SHOWCASE &&
+        asset &&
+        asset.data.wearable?.isSmart &&
+        videoHash
+      ) {
+        return onPlaySmartWearableVideoShowcase(videoHash)
+      }
+
+      if (wearableController) {
+        switch (action) {
+          case ControlOptionAction.ZOOM_IN: {
+            await wearableController.scene.changeZoom(ZOOM_DELTA)
+            break
+          }
+          case ControlOptionAction.ZOOM_OUT: {
+            await wearableController.scene.changeZoom(-ZOOM_DELTA)
+            break
+          }
+          case ControlOptionAction.PLAY_EMOTE: {
+            await wearableController.emote.play()
+            break
+          }
+          case ControlOptionAction.STOP_EMOTE: {
+            await wearableController.emote.stop()
+            break
+          }
+          case ControlOptionAction.ENABLE_SOUND: {
+            await wearableController.emote.enableSound()
+            break
+          }
+          case ControlOptionAction.DISABLE_SOUND: {
+            await wearableController.emote.disableSound()
+            break
+          }
+          default:
+            break
+        }
+      }
+    },
+    [asset, videoHash, wearableController, onPlaySmartWearableVideoShowcase]
+  )
+
+  useEffect(() => {
+    if (
+      asset.category === NFTCategory.EMOTE &&
+      wearableController &&
+      isDraggable &&
+      hasSound === undefined
+    ) {
+      wearableController.emote?.hasSound().then(sound => {
+        setHasSound(sound)
+      })
+    }
+  }, [wearableController, asset.category, isDraggable, hasSound])
 
   const estateSelection = useMemo(() => (estate ? getSelection(estate) : []), [
     estate
   ])
 
   const [isTracked, setIsTracked] = useState(false)
+
+  const isAvailableForMint =
+    isNFT(asset) &&
+    (item?.category === NFTCategory.WEARABLE ||
+      item?.category === NFTCategory.EMOTE) &&
+    item.available > 0 &&
+    item.isOnSale
 
   // pick a random emote
   const previewEmote = useMemo(() => {
@@ -107,10 +213,15 @@ const AssetImage = (props: Props) => {
   useEffect(() => {
     const isPreview = asset.category === NFTCategory.WEARABLE && isDraggable
     if (!isTracked && isPreview) {
-      getAnalytics().track('Init Preview', {
+      getAnalytics().track(events.INIT_PREVIEW, {
         mode: isTryingOn ? 'avatar' : 'wearable'
       })
       setIsTracked(true)
+    }
+    return () => {
+      if (asset.category === NFTCategory.EMOTE && wearableController) {
+        onSetWearablePreviewController(null)
+      }
     }
   }, []) // eslint-disable-line
 
@@ -128,7 +239,12 @@ const AssetImage = (props: Props) => {
           withNavigation={withNavigation}
           selection={selection}
           zoom={zoom}
-        />
+          showForRent={false}
+          showOnSale={false}
+          showOwned={false}
+        >
+          {hasBadges && children}
+        </Atlas>
       )
     }
 
@@ -143,8 +259,13 @@ const AssetImage = (props: Props) => {
           withNavigation={withNavigation}
           selection={estateSelection}
           zoom={zoom}
+          showForRent={false}
+          showOnSale={false}
+          showOwned={false}
           isEstate
-        />
+        >
+          {hasBadges && children}
+        </Atlas>
       )
     }
 
@@ -182,12 +303,29 @@ const AssetImage = (props: Props) => {
 
         const isTryingOnEnabled = isTryingOn && hasRepresentation
 
+        const ethereumUrn =
+          !isNFT(asset) && asset.network === Network.ETHEREUM
+            ? getEthereumItemUrn(asset)
+            : ''
+
+        const wearablePreviewProps =
+          !isNFT(asset) && asset.network === Network.ETHEREUM
+            ? {
+                urns: [ethereumUrn],
+                background: Rarity.getColor(asset.rarity),
+                type: isTryingOn ? PreviewType.AVATAR : PreviewType.WEARABLE
+              }
+            : {
+                contractAddress: asset.contractAddress,
+                itemId,
+                tokenId
+              }
+
+        const isOwnerOfNFT = isNFT(asset) && wallet?.address === asset.owner
+
         wearablePreview = (
           <>
             <WearablePreview
-              contractAddress={asset.contractAddress}
-              itemId={itemId}
-              tokenId={tokenId}
               profile={
                 isTryingOnEnabled
                   ? avatar
@@ -197,11 +335,22 @@ const AssetImage = (props: Props) => {
               }
               skin={skin}
               hair={hair}
-              emote={previewEmote}
+              emote={isTryingOnEnabled ? previewEmote : undefined}
               onLoad={handleLoad}
               onError={handleError}
+              {...wearablePreviewProps}
               dev={config.is(Env.DEVELOPMENT)}
             />
+            {isAvailableForMint && !isOwnerOfNFT ? (
+              <AvailableForMintPopup
+                price={item.price}
+                stock={item.available}
+                rarity={item.rarity}
+                contractAddress={item.contractAddress}
+                itemId={item.itemId}
+                network={item.network}
+              />
+            ) : null}
             {isLoadingWearablePreview ? (
               <Center>
                 <Loader
@@ -210,6 +359,21 @@ const AssetImage = (props: Props) => {
                   size="large"
                 />
               </Center>
+            ) : asset.data.wearable?.isSmart && asset.urn && videoHash ? (
+              <div className="play-control">
+                <Button
+                  className="play-button"
+                  size="small"
+                  onClick={() =>
+                    handleControlActionChange(
+                      ControlOptionAction.PLAY_SMART_WEARABLE_VIDEO_SHOWCASE
+                    )
+                  }
+                >
+                  <Icon name="video" />
+                  <span>{t('smart_wearable.play_showcase')}</span>
+                </Button>
+              </div>
             ) : null}
             <Popup
               content={
@@ -287,6 +451,7 @@ const AssetImage = (props: Props) => {
               src={getAssetImage(asset)}
             />
           )}
+          {hasBadges && children}
         </div>
       )
     }
@@ -300,19 +465,95 @@ const AssetImage = (props: Props) => {
       } else if ('tokenId' in asset && asset.tokenId) {
         tokenId = asset.tokenId
       }
+      const zoomControls = (
+        <div className="asset-zoom-controls">
+          <Button
+            animated={false}
+            className="zoom-control zoom-in-control"
+            onClick={() =>
+              handleControlActionChange(ControlOptionAction.ZOOM_IN)
+            }
+          >
+            <Icon name="plus" />
+          </Button>
+          <Button
+            animated={false}
+            className="zoom-control zoom-out-control"
+            onClick={() =>
+              handleControlActionChange(ControlOptionAction.ZOOM_OUT)
+            }
+          >
+            <Icon name="minus" />
+          </Button>
+        </div>
+      )
+      const playButton = (
+        <div className="play-control">
+          <Button
+            className="play-button"
+            size="small"
+            onClick={() =>
+              handleControlActionChange(
+                isPlayingEmote
+                  ? ControlOptionAction.STOP_EMOTE
+                  : ControlOptionAction.PLAY_EMOTE
+              )
+            }
+          >
+            {isPlayingEmote ? <Icon name="stop" /> : <Icon name="play" />}
+            <span>
+              {isPlayingEmote
+                ? t('wearable_preview.stop_emote')
+                : t('wearable_preview.play_emote')}
+            </span>
+          </Button>
+          {hasSound && (
+            <Button
+              className={classNames('sound-button', {
+                enabled: isSoundEnabled
+              })}
+              size="small"
+              aria-label="enable sound"
+              onClick={() => {
+                handleControlActionChange(
+                  isSoundEnabled
+                    ? ControlOptionAction.DISABLE_SOUND
+                    : ControlOptionAction.ENABLE_SOUND
+                )
+                setIsSoundEnabled(!isSoundEnabled)
+              }}
+            />
+          )}
+        </div>
+      )
+
+      const isOwnerOfNFT = isNFT(asset) && wallet?.address === asset.owner
 
       if (isDraggable) {
         wearablePreview = (
           <>
             <WearablePreview
+              id="wearable-preview"
               contractAddress={asset.contractAddress}
               itemId={itemId}
               tokenId={tokenId}
               profile={avatar ? avatar.ethAddress : 'default'}
+              wheelZoom={1.5}
+              wheelStart={100}
               onLoad={handleLoad}
               onError={handleError}
               dev={config.is(Env.DEVELOPMENT)}
             />
+            {isAvailableForMint && !isOwnerOfNFT ? (
+              <AvailableForMintPopup
+                price={item.price}
+                stock={item.available}
+                rarity={item.rarity}
+                contractAddress={item.contractAddress}
+                itemId={item.itemId}
+                network={item.network}
+              />
+            ) : null}
             {isLoadingWearablePreview ? (
               <Center>
                 <Loader
@@ -321,7 +562,12 @@ const AssetImage = (props: Props) => {
                   size="large"
                 />
               </Center>
-            ) : null}
+            ) : (
+              <>
+                {zoomControls}
+                {playButton}
+              </>
+            )}
           </>
         )
       }
@@ -347,6 +593,7 @@ const AssetImage = (props: Props) => {
               src={getAssetImage(asset)}
             />
           )}
+          {hasBadges && children}
         </div>
       )
     }
@@ -362,25 +609,27 @@ const AssetImage = (props: Props) => {
         <div className={classes.join(' ')}>
           <div className="name">{name}</div>
           {showMonospace ? <div className="monospace">{name}</div> : null}
+          {hasBadges && children}
         </div>
       )
     }
 
     default: {
       return (
-        <LazyImage
+        <LazyLoadImage
           src={getAssetImage(asset)}
           alt={getAssetName(asset)}
-          debounceDurationMs={1000}
-          placeholder={({ ref }) => (
-            <div ref={ref}>
+          delayMethod="debounce"
+          className="image"
+          delayTime={1000}
+          placeholder={
+            <div>
               <Loader size="small" active />
             </div>
-          )}
-          actual={({ imageProps }) => (
-            <img className="image" alt={getAssetName(asset)} {...imageProps} />
-          )}
-        />
+          }
+        >
+          {hasBadges && children}
+        </LazyLoadImage>
       )
     }
   }
@@ -388,18 +637,117 @@ const AssetImage = (props: Props) => {
 
 // the purpose of this wrapper is to make the div always be square, by using a 1x1 transparent pixel
 const AssetImageWrapper = (props: Props) => {
-  const { asset, className, ...rest } = props
+  const {
+    asset,
+    className,
+    showOrderListedTag,
+    item,
+    onFetchItem,
+    order,
+    wallet,
+    ...rest
+  } = props
 
-  let classes = 'AssetImage'
+  const [videoHash, setVideoHash] = useState<string | undefined>(undefined)
+
+  const fetchSmartWearableVideoHash = useCallback(async () => {
+    if (!asset?.urn) return
+
+    const videoHash = await getSmartWearableVideoShowcase(asset)
+    if (videoHash) setVideoHash(videoHash)
+  }, [asset])
+
+  useEffect(() => {
+    if (!item && isNFT(asset) && asset.itemId) {
+      onFetchItem(asset.contractAddress, asset.itemId)
+    }
+
+    if (asset && asset.data.wearable?.isSmart && asset.urn)
+      fetchSmartWearableVideoHash()
+  }, [asset, fetchSmartWearableVideoHash, item, onFetchItem])
+
+  const isAvailableForMint = useMemo(
+    () =>
+      isNFT(asset) &&
+      (item?.category === NFTCategory.WEARABLE ||
+        item?.category === NFTCategory.EMOTE) &&
+      item.available > 0 &&
+      item.isOnSale,
+    [asset, item]
+  )
+
+  let classes = `AssetImage ${isAvailableForMint ? 'hasMintAvailable' : ''}`
   if (className) {
     classes += ' ' + className
   }
+
+  const coordinates: { x: number; y: number } | null = useMemo(() => {
+    switch (asset.category) {
+      case NFTCategory.ESTATE: {
+        if (asset.data.estate!.size) {
+          return {
+            x: asset.data.estate!.parcels[0].x,
+            y: asset.data.estate!.parcels[0].y
+          }
+        }
+        return null
+      }
+      case NFTCategory.PARCEL: {
+        return {
+          x: Number(asset.data.parcel!.x),
+          y: Number(asset.data.parcel!.y)
+        }
+      }
+      default:
+        return null
+    }
+  }, [asset])
 
   return (
     <div className={classes}>
       <img src={PIXEL} alt="pixel" className="pixel" />
       <div className="image-wrapper">
-        <AssetImage asset={asset} {...rest} />
+        {showOrderListedTag || !!order ? (
+          <>
+            {showOrderListedTag ? (
+              <ListedBadge className="listed-badge" />
+            ) : null}
+            {!!order &&
+            wallet?.address === order.owner &&
+            isLegacyOrder(order) ? (
+              <WarningBadge />
+            ) : null}
+          </>
+        ) : null}
+        <AssetImage
+          asset={asset}
+          item={item}
+          onFetchItem={onFetchItem}
+          wallet={wallet}
+          videoHash={videoHash}
+          {...rest}
+        >
+          <div className="badges">
+            {coordinates ? (
+              <>
+                {asset.category === NFTCategory.ESTATE ? (
+                  <>
+                    <Badge className="coordinates" color="#37333d">
+                      {asset.data.estate!.size.toLocaleString()} LAND
+                    </Badge>
+                  </>
+                ) : (
+                  <Coordinate
+                    className="coordinates"
+                    x={coordinates.x}
+                    y={coordinates.y}
+                  />
+                )}
+                <JumpIn compact x={coordinates.x} y={coordinates.y} />
+              </>
+            ) : null}
+          </div>
+        </AssetImage>
       </div>
     </div>
   )

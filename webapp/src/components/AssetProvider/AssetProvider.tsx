@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { AssetType } from '../../modules/asset/types'
 import { Props } from './AssetProvider.types'
 
@@ -7,30 +7,95 @@ const AssetProvider = (props: Props) => {
     type,
     asset,
     order,
+    rental,
     isLoading,
     children,
     onFetchNFT,
     onFetchItem,
+    onClearErrors,
     contractAddress,
-    tokenId
+    tokenId,
+    rentalStatus,
+    isLoadingFeatureFlags,
+    isLandOrEstate,
+    retry,
+    error,
+    isConnecting
   } = props
 
+  const [hasLoadedInitialFlags, setHasLoadedInitialFlags] = useState(false)
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false)
+
   useEffect(() => {
-    if (contractAddress && tokenId) {
+    if (error && !isLoading && retry && hasFetchedOnce) {
+      onClearErrors()
+      setTimeout(() => {
+        setHasFetchedOnce(false)
+      }, 3000)
+    }
+  }, [hasFetchedOnce, isLoading, error, retry, onClearErrors])
+
+  useEffect(() => {
+    if (!isLoadingFeatureFlags) {
+      setHasLoadedInitialFlags(true)
+    }
+  }, [isLoadingFeatureFlags])
+
+  useEffect(() => {
+    setHasFetchedOnce(false)
+  }, [contractAddress, tokenId])
+
+  useEffect(() => {
+    if (
+      contractAddress &&
+      tokenId &&
+      asset === null &&
+      !isLoading &&
+      !hasFetchedOnce &&
+      !isConnecting
+    ) {
       switch (type) {
         case AssetType.NFT:
-          onFetchNFT(contractAddress, tokenId)
+          if (hasLoadedInitialFlags) {
+            onFetchNFT(contractAddress, tokenId, {
+              rentalStatus: isLandOrEstate ? rentalStatus : undefined
+            })
+            setHasFetchedOnce(true)
+          }
           break
         case AssetType.ITEM:
           onFetchItem(contractAddress, tokenId)
+          setHasFetchedOnce(true)
           break
         default:
           throw new Error(`Invalid Asset type ${type}`)
       }
     }
-  }, [contractAddress, tokenId, type, onFetchNFT, onFetchItem])
+  }, [
+    asset,
+    contractAddress,
+    hasFetchedOnce,
+    tokenId,
+    type,
+    onFetchNFT,
+    onFetchItem,
+    rentalStatus,
+    hasLoadedInitialFlags,
+    isLoading,
+    isLandOrEstate,
+    isConnecting
+  ])
 
-  return <>{children(asset, order, isLoading)}</>
+  return (
+    <>
+      {children(
+        asset,
+        order,
+        rental,
+        isLoading || (!hasLoadedInitialFlags && type === AssetType.NFT)
+      )}
+    </>
+  )
 }
 
 export default React.memo(AssetProvider)

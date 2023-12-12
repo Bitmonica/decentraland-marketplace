@@ -1,12 +1,11 @@
-import {
-  BuildEntityWithoutFilesOptions,
-  CatalystClient,
-  DeploymentPreparationData
-} from 'dcl-catalyst-client'
-import { Entity, EntityContentItemReference } from 'dcl-catalyst-commons'
+import { Entity } from '@dcl/schemas'
+import { Authenticator, AuthIdentity } from '@dcl/crypto'
+import { ContentClient } from 'dcl-catalyst-client/dist/client/ContentClient'
+import { DeploymentPreparationData, buildEntity } from 'dcl-catalyst-client/dist/client/utils/DeploymentBuilder'
+import { BuildEntityWithoutFilesOptions } from 'dcl-catalyst-client/dist/client/types'
+import { EntityContentItemReference } from 'dcl-catalyst-commons'
 import { LinkType, Store, StoreEntityMetadata } from './types'
 import { peerUrl } from '../../lib/environment'
-import { Authenticator, AuthIdentity } from 'dcl-crypto'
 
 export const getPeerCoverUrl = (hash: string) =>
   `${peerUrl}/content/contents/${hash}`
@@ -120,17 +119,16 @@ export const getEntityMetadataFilesFromStore = async (store: Store) => {
 // Requests
 
 export const fetchStoreEntity = async (
-  client: CatalystClient,
+  client: ContentClient,
   address: string
 ): Promise<Entity | null> => {
-  const type: any = 'store'
   const urn = getStoreUrn(address)
-  const entities = await client.fetchEntitiesByPointers(type, [urn])
+  const entities = await client.fetchEntitiesByPointers([urn])
   return entities.length === 0 ? null : entities[0]
 }
 
 export const deployStoreEntity = async (
-  client: CatalystClient,
+  client: ContentClient,
   identity: AuthIdentity,
   store: Store
 ) => {
@@ -145,35 +143,35 @@ export const deployStoreEntity = async (
     timestamp: Date.now()
   }
 
-  const entity: DeploymentPreparationData = await client.buildEntity({
+  const entity: DeploymentPreparationData = await buildEntity({
     ...options,
     files
   })
 
   const authChain = Authenticator.signPayload(identity, entity.entityId)
 
-  return client.deployEntity({ ...entity, authChain })
+  return client.deploy({ ...entity, authChain })
 }
 
 // Validations
 
-export const linkStartWiths: Record<LinkType, string> = {
+export const linkStartsWith: Record<LinkType, string> = {
   [LinkType.WEBSITE]: 'https://',
   [LinkType.FACEBOOK]: 'https://www.facebook.com/',
   [LinkType.TWITTER]: 'https://www.twitter.com/',
-  [LinkType.DISCORD]: 'https://discord.com/channels/'
+  [LinkType.DISCORD]: 'https://discord.gg/'
 }
 
 export const getIsValidLink = (type: LinkType, link: string) => {
   switch (type) {
     case LinkType.WEBSITE:
-      return link.startsWith(linkStartWiths.website)
+      return link.startsWith(linkStartsWith.website)
     case LinkType.FACEBOOK:
-      return link.startsWith(linkStartWiths.facebook)
+      return link.startsWith(linkStartsWith.facebook)
     case LinkType.TWITTER:
-      return link.startsWith(linkStartWiths.twitter)
+      return link.startsWith(linkStartsWith.twitter)
     case LinkType.DISCORD:
-      return link.startsWith(linkStartWiths.discord)
+      return link.startsWith(linkStartsWith.discord)
     default:
       throw new Error(`Invalid LinkType '${type}'`)
   }

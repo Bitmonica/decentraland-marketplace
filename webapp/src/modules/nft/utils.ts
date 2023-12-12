@@ -1,4 +1,5 @@
-import { BodyShape } from '@dcl/schemas'
+import { BodyShape, NFTCategory } from '@dcl/schemas'
+import { Asset } from '../asset/types'
 import { NFT } from './types'
 
 export function getNFTId(contractAddress: string, tokenId: string) {
@@ -21,13 +22,32 @@ export function getNFT(
   return nftId in nfts ? nfts[nftId] : null
 }
 
+export const getBodyShapeUrn = (bodyShape: string) =>
+  `urn:decentraland:off-chain:base-avatars:${bodyShape}`
+
 export function isGender(bodyShapes: BodyShape[], gender: BodyShape) {
   if (bodyShapes.length !== 1) {
     return false
   }
-  return bodyShapes[0] === gender
+  return bodyShapes[0] === gender || getBodyShapeUrn(bodyShapes[0]) === gender
 }
 
 export function isUnisex(bodyShapes: BodyShape[]) {
   return bodyShapes.length === 2
+}
+
+export function isLand(nft: Asset) {
+  return (
+    nft.category === NFTCategory.PARCEL || nft.category === NFTCategory.ESTATE
+  )
+}
+
+export function isParcel(nft: Asset) {
+  return nft.category === NFTCategory.PARCEL
+}
+
+export function isPartOfEstate(nft: NFT): boolean {
+  return Boolean(
+    nft.category === NFTCategory.PARCEL && nft.data?.parcel?.estate
+  )
 }

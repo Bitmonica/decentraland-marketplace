@@ -3,10 +3,11 @@ import { connect } from 'react-redux'
 import { RootState } from '../../../../modules/reducer'
 import { clearFilters } from '../../../../modules/routing/actions'
 import {
+  getOnlyOnRent,
   getOnlySmart,
   hasFiltersEnabled
 } from '../../../../modules/routing/selectors'
-import { getCount } from '../../../../modules/ui/browse/selectors'
+import { getCount, getView } from '../../../../modules/ui/browse/selectors'
 import {
   getSection,
   getSortBy,
@@ -17,8 +18,10 @@ import {
   getSearch,
   getContracts,
   getNetwork,
-  getAssetType
+  getAssetType,
+  getEmotePlayMode
 } from '../../../../modules/routing/selectors'
+import { isMapSet } from '../../../../modules/routing/utils'
 import {
   MapStateProps,
   MapDispatchProps,
@@ -32,15 +35,18 @@ const mapState = (state: RootState): MapStateProps => ({
   assetType: getAssetType(state),
   count: getCount(state),
   section: getSection(state),
+  view: getView(state),
   sortBy: getSortBy(state),
   search: getSearch(state),
   onlyOnSale: getOnlyOnSale(state),
+  onlyOnRent: getOnlyOnRent(state),
   onlySmart: getOnlySmart(state),
-  isMap: getIsMap(state),
+  isMap: isMapSet(getIsMap(state), getSection(state), getView(state)),
   rarities: getRarities(state),
   wearableGenders: getWearableGenders(state),
   contracts: getContracts(state),
   network: getNetwork(state),
+  emotePlayMode: getEmotePlayMode(state),
   hasFiltersEnabled: hasFiltersEnabled(state)
 })
 

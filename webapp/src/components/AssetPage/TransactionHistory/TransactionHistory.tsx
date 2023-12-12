@@ -1,163 +1,104 @@
-import { Link } from 'react-router-dom'
 import React, { useState, useEffect } from 'react'
-import { Sale } from '@dcl/schemas'
-import {
-  Header,
-  Table,
-  Mobile,
-  NotMobile,
-  Pagination,
-  Loader,
-  Row
-} from 'decentraland-ui'
+import { useTabletAndBelowMediaQuery } from 'decentraland-ui'
+import { Item } from '@dcl/schemas'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
-import { Profile } from 'decentraland-dapps/dist/containers'
-import dateFnsFormat from 'date-fns/format'
-
-import { Mana } from '../../Mana'
-import { locations } from '../../../modules/routing/locations'
 import { saleAPI } from '../../../modules/vendor/decentraland'
-import { formatDistanceToNow } from '../../../lib/date'
-import { formatWeiMANA } from '../../../lib/mana'
+import { isNFT } from '../../../modules/asset/utils'
+import { NFT } from '../../../modules/nft/types'
+import TableContainer from '../../Table/TableContainer'
+import { TableContent } from '../../Table/TableContent'
+import { DataTableType } from '../../Table/TableContent/TableContent.types'
+import { formatDataToTable } from './utils'
 import { Props } from './TransactionHistory.types'
 import './TransactionHistory.css'
 
-const INPUT_FORMAT = 'PPP'
-const WEEK_IN_MILLISECONDS = 7 * 24 * 60 * 60 * 1000
-const ROWS_PER_PAGE = 12
-
-const formatEventDate = (updatedAt: number) => {
-  const newUpdatedAt = new Date(updatedAt)
-  return Date.now() - newUpdatedAt.getTime() > WEEK_IN_MILLISECONDS
-    ? dateFnsFormat(newUpdatedAt, INPUT_FORMAT)
-    : formatDistanceToNow(newUpdatedAt, { addSuffix: true })
-}
-
-const formatDateTitle = (updatedAt: number) => {
-  return new Date(updatedAt).toLocaleString()
-}
+const ROWS_PER_PAGE = 5
 
 const TransactionHistory = (props: Props) => {
   const { asset } = props
+  const isMobileOrTablet = useTabletAndBelowMediaQuery()
 
-  const [sales, setSales] = useState([] as Sale[])
+  const tabList = [
+    {
+      value: 'transaction_history',
+      displayValue: t('transaction_history.title')
+    }
+  ]
+
+  const [sales, setSales] = useState<DataTableType[]>([])
   const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const isAssetNull = asset === null
+  const isAssetNFT = asset && isNFT(asset)
+  const assetContractAddress = asset?.contractAddress
+  const assetTokenId = asset ? (asset as NFT).tokenId : '0'
+  const assetItemId = asset ? (asset as Item).itemId : '0'
 
   // We're doing this outside of redux to avoid having to store all orders when we only care about the last open one
   useEffect(() => {
-    if (asset) {
+    let cancel = false
+    if (!isAssetNull) {
       setIsLoading(true)
       let params: Record<string, string | number> = {
-        contractAddress: asset.contractAddress,
+        contractAddress: assetContractAddress!,
         first: ROWS_PER_PAGE,
         skip: (page - 1) * ROWS_PER_PAGE
       }
-      if ('tokenId' in asset) {
-        params.tokenId = asset.tokenId
+      if (isAssetNFT) {
+        params.tokenId = assetTokenId
       } else {
-        params.itemId = asset.itemId
+        params.itemId = assetItemId
       }
       saleAPI
         .fetch(params)
         .then(response => {
-          setSales(response.data)
-          setTotalPages((response.total / ROWS_PER_PAGE) | 0)
+          if (cancel) return
+          setTotal(response.total)
+          setSales(formatDataToTable(response.data, isMobileOrTablet))
+          setTotalPages(Math.ceil(response.total / ROWS_PER_PAGE) | 0)
         })
-        .finally(() => setIsLoading(false))
+        .finally(() => !cancel && setIsLoading(false))
         .catch(error => {
           console.error(error)
         })
     }
-  }, [asset, setIsLoading, setSales, page])
+    return () => {
+      cancel = true
+    }
+  }, [
+    assetContractAddress,
+    assetTokenId,
+    assetItemId,
+    setIsLoading,
+    setSales,
+    page,
+    isAssetNull,
+    isAssetNFT,
+    isMobileOrTablet
+  ])
 
-  const network = asset ? asset.network : undefined
-
-  return (
+  return sales.length > 0 ? (
     <div className="TransactionHistory">
-      {isLoading && sales.length === 0 ? null : sales.length > 0 ? (
-        <>
-          <Header sub>{t('transaction_history.title')}</Header>
-          <NotMobile>
-            <Table basic="very">
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell>
-                    {t('transaction_history.from')}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>
-                    {t('transaction_history.to')}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>
-                    {t('transaction_history.type')}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>
-                    {t('transaction_history.when')}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>
-                    {t('transaction_history.price')}
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-
-              <Table.Body className={isLoading ? 'is-loading' : ''}>
-                {sales.map(sale => (
-                  <Table.Row key={sale.id}>
-                    <Table.Cell>
-                      <Link to={locations.account(sale.seller)}>
-                        <Profile address={sale.seller} />
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Link to={locations.account(sale.buyer)}>
-                        <Profile address={sale.buyer} />
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>{t(`global.${sale.type}`)}</Table.Cell>
-                    <Table.Cell title={formatDateTitle(sale.timestamp)}>
-                      {formatEventDate(sale.timestamp)}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Mana network={network} inline>
-                        {formatWeiMANA(sale.price)}
-                      </Mana>
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-                {isLoading ? <Loader active /> : null}
-              </Table.Body>
-            </Table>
-          </NotMobile>
-          <Mobile>
-            <div className="mobile-tx-history">
-              {sales.map(sale => (
-                <div className="mobile-tx-history-row" key={sale.id}>
-                  <div className="price">
-                    <Mana network={network} inline>
-                      {formatWeiMANA(sale.price)}
-                    </Mana>
-                  </div>
-                  <div className="when">{formatEventDate(sale.timestamp)}</div>
-                </div>
-              ))}
-            </div>
-          </Mobile>
-          {totalPages > 1 ? (
-            <Row center>
-              <Pagination
-                activePage={page}
-                totalPages={totalPages}
-                onPageChange={(_event, props) => setPage(+props.activePage!)}
-                firstItem={null}
-                lastItem={null}
-              />
-            </Row>
-          ) : null}
-        </>
-      ) : null}
+      <TableContainer
+        tabsList={tabList}
+        children={
+          <TableContent
+            hasHeaders
+            data={sales}
+            activePage={page}
+            isLoading={isLoading}
+            setPage={setPage}
+            totalPages={totalPages}
+            empty={() => null}
+            total={total}
+            rowsPerPage={ROWS_PER_PAGE}
+          />
+        }
+      />
     </div>
-  )
+  ) : null
 }
 
 export default React.memo(TransactionHistory)

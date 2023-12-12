@@ -1,24 +1,28 @@
-import { Contract, providers, utils } from 'ethers'
+import { ethers } from 'ethers'
 import { Bid } from '@dcl/schemas'
 import { getNetworkProvider } from 'decentraland-dapps/dist/lib/eth'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
 import { ContractName, getContract } from 'decentraland-transactions'
+import { isErrorWithMessage } from '../../lib/error'
 
 export async function isInsufficientMANA(bid: Bid) {
   try {
     const provider = await getNetworkProvider(bid.chainId)
     const contract = getContract(ContractName.MANAToken, bid.chainId)
-    const mana = new Contract(
+    const mana = new ethers.Contract(
       contract.address,
       contract.abi,
-      new providers.Web3Provider(provider)
+      new ethers.providers.Web3Provider(provider)
     )
     const balanceRaw = await mana.balanceOf(bid.bidder)
-    const balance = parseFloat(utils.formatEther(balanceRaw))
-    const price = parseFloat(utils.formatEther(bid.price))
+    const balance = parseFloat(ethers.utils.formatEther(balanceRaw))
+    const price = parseFloat(ethers.utils.formatEther(bid.price))
 
     return balance < price
   } catch (error) {
-    console.warn(error.message)
+    console.warn(
+      isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+    )
   }
   return false
 }

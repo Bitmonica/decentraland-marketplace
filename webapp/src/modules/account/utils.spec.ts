@@ -1,4 +1,12 @@
-import { sumAccountMetrics } from './utils'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { Account, Avatar, Profile } from '@dcl/schemas'
+import { NFTResult } from '../vendor/decentraland'
+import {
+  enhanceCreatorName,
+  fromProfilesToCreators,
+  sumAccountMetrics
+} from './utils'
+import { CreatorAccount } from './types'
 
 describe('when summing account metrics', () => {
   it('should return an account metric with its values added from the provided account metrics', () => {
@@ -28,6 +36,80 @@ describe('when summing account metrics', () => {
       royalties: '300',
       sales: 300,
       spent: '300'
+    })
+  })
+})
+
+describe('when transforming profiles and accounts objects to creators entities', () => {
+  let profiles: Profile[]
+  let accounts: Account[]
+  let avatarName: string
+  let ethAddress: string
+  let collectionsAmount: number
+  beforeEach(() => {
+    avatarName = 'anAvatarName'
+    ethAddress = 'anEthAddress'
+    profiles = [
+      {
+        avatars: [
+          {
+            name: avatarName,
+            ethAddress
+          } as Avatar
+        ]
+      }
+    ]
+    collectionsAmount = 3
+    accounts = [
+      { address: ethAddress, collections: collectionsAmount } as Account
+    ]
+  })
+  it('should return an creator account with the values from the profile and account', () => {
+    expect(fromProfilesToCreators(profiles, accounts)).toEqual([
+      {
+        name: avatarName,
+        address: ethAddress,
+        collections: collectionsAmount
+      }
+    ])
+  })
+})
+
+describe('when enhancing creator name', () => {
+  let creator: CreatorAccount
+  let ens: NFTResult[]
+  let search: string
+  beforeEach(() => {
+    creator = {
+      name: 'aName',
+      address: 'anAddress',
+      collections: 1
+    }
+    ens = [
+      {
+        nft: {
+          owner: creator.address,
+          name: 'aName'
+        }
+      } as NFTResult
+    ]
+    search = 'aName'
+  })
+  describe('when the creator name does not contain the search', () => {
+    beforeEach(() => {
+      creator.name = 'anotherName'
+    })
+    it('should enhance the name and add the profile name at the end', () => {
+      enhanceCreatorName(creator, ens, search)
+      expect(creator.name).toEqual(
+        `aName (${t('global.currently')} anotherName)`
+      )
+    })
+  })
+  describe('when the creator name contains the search', () => {
+    it('should not change the creator name', () => {
+      enhanceCreatorName(creator, ens, search)
+      expect(creator.name).toEqual('aName')
     })
   })
 })

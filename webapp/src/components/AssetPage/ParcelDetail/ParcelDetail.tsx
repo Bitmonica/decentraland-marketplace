@@ -2,24 +2,27 @@ import React from 'react'
 import { NFTCategory } from '@dcl/schemas'
 import { T } from 'decentraland-dapps/dist/modules/translation/utils'
 import { Link } from 'react-router-dom'
-import { Network } from '../Network'
+import { locations } from '../../../modules/routing/locations'
+import { isLand } from '../../../modules/nft/utils'
+import { Coordinate } from '../../Coordinate'
+import { AssetImage } from '../../AssetImage'
+import { Network } from '../../Network'
 import { Description } from '../Description'
-import { Props } from './ParcelDetail.types'
-import { Owner } from '../Owner'
-import Price from '../Price'
+import Price from '../../Price'
 import Expiration from '../Expiration'
 import { Actions } from '../Actions'
 import { BidList } from '../BidList'
-import { TransactionHistory } from '../TransactionHistory'
-import { Coordinate } from '../../Coordinate'
 import { JumpIn } from '../JumpIn'
+import { TransactionHistory } from '../TransactionHistory'
+import { RentalHistory } from '../RentalHistory'
 import { ProximityHighlights } from '../ProximityHighlights'
-import { locations } from '../../../modules/routing/locations'
 import BaseDetail from '../BaseDetail'
-import { AssetImage } from '../../AssetImage'
+import { SaleRentActionBox } from '../SaleRentActionBox'
+import { Owner } from '../Owner'
+import { Props } from './ParcelDetail.types'
 import styles from './ParcelDetail.module.css'
 
-const ParcelDetail = ({ nft }: Props) => {
+const ParcelDetail = ({ nft, order, rental }: Props) => {
   const parcel = nft.data.parcel!
   const { x, y } = parcel
   const isPartOfEstate = nft.category === NFTCategory.PARCEL && parcel.estate
@@ -27,9 +30,11 @@ const ParcelDetail = ({ nft }: Props) => {
   return (
     <BaseDetail
       asset={nft}
+      rental={rental ?? undefined}
       assetImage={
         <AssetImage asset={nft} isDraggable withNavigation hasPopup />
       }
+      showDetails={isLand(nft)}
       isOnSale={!!nft.activeOrderId}
       badges={
         <>
@@ -44,6 +49,7 @@ const ParcelDetail = ({ nft }: Props) => {
           <ProximityHighlights nft={nft} />
         </>
       }
+      actions={<SaleRentActionBox order={order} nft={nft} rental={rental} />}
       box={
         <>
           {isPartOfEstate && (
@@ -73,6 +79,7 @@ const ParcelDetail = ({ nft }: Props) => {
         <>
           <BidList nft={nft} />
           <TransactionHistory asset={nft} />
+          <RentalHistory asset={nft} />
         </>
       }
     />

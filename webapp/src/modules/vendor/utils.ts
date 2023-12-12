@@ -1,6 +1,7 @@
-import { NFTCategory } from '@dcl/schemas'
+import { NFTCategory, RentalStatus } from '@dcl/schemas'
 import {
   getCategoryFromSection,
+  getSearchEmoteCategory,
   getSearchWearableCategory
 } from '../routing/search'
 import { BrowseOptions } from '../routing/types'
@@ -12,13 +13,15 @@ export function getFilters(
   vendor: VendorName,
   options: BrowseOptions
 ): NFTsFetchFilters {
-  const { section } = options
+  const { section, address } = options
 
   switch (vendor) {
     case VendorName.DECENTRALAND: {
       const currentSection = Sections[VendorName.DECENTRALAND]
 
       const isLand = section === currentSection.LAND
+      const isParcelsOrEstates =
+        section === currentSection.PARCELS || section === currentSection.ESTATES
       const isWearableHead = section === currentSection.WEARABLES_HEAD
       const isWearableAccessory =
         section === currentSection.WEARABLES_ACCESSORIES
@@ -29,12 +32,27 @@ export function getFilters(
           ? getSearchWearableCategory(section!)
           : undefined
 
+      const emoteCategory =
+        category === NFTCategory.EMOTE
+          ? getSearchEmoteCategory(section!)
+          : undefined
+
       const {
         rarities,
         wearableGenders,
         contracts,
+        creators,
         network,
-        onlySmart
+        onlySmart,
+        emotePlayMode,
+        minPrice,
+        maxPrice,
+        minEstateSize,
+        maxEstateSize,
+        adjacentToRoad,
+        minDistanceToPlaza,
+        maxDistanceToPlaza,
+        rentalDays
       } = options
 
       return {
@@ -43,22 +61,27 @@ export function getFilters(
         isWearableAccessory,
         isWearableSmart: onlySmart,
         wearableCategory,
+        emoteCategory,
         rarities,
         wearableGenders,
         contracts,
-        network
-      } as NFTsFetchFilters<VendorName.DECENTRALAND>
+        creator: creators,
+        network,
+        emotePlayMode,
+        rentalStatus:
+          (isLand || isParcelsOrEstates) && address
+            ? [RentalStatus.OPEN, RentalStatus.EXECUTED]
+            : undefined,
+        minPrice,
+        maxPrice,
+        minEstateSize,
+        maxEstateSize,
+        adjacentToRoad,
+        minDistanceToPlaza,
+        maxDistanceToPlaza,
+        rentalDays
+      }
     }
-    case VendorName.KNOWN_ORIGIN: {
-      const currentSection = Sections[VendorName.KNOWN_ORIGIN]
-
-      return {
-        isEdition: section === currentSection.EDITIONS,
-        isToken: section === currentSection.TOKENS
-      } as NFTsFetchFilters<VendorName.KNOWN_ORIGIN>
-    }
-    case VendorName.SUPER_RARE:
-    case VendorName.MAKERS_PLACE:
     default:
       return {}
   }
@@ -68,12 +91,6 @@ export function getOriginURL(vendor: VendorName) {
   switch (vendor) {
     case VendorName.DECENTRALAND:
       return 'https://market.decentraland.org'
-    case VendorName.SUPER_RARE:
-      return 'https://www.superrare.co'
-    case VendorName.MAKERS_PLACE:
-      return 'https://makersplace.com'
-    case VendorName.KNOWN_ORIGIN:
-      return 'https://knownorigin.io'
     default:
       throw new Error(`Base URL for ${vendor} not implemented`)
   }

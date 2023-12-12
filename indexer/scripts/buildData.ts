@@ -5,16 +5,21 @@ import * as path from 'path'
 
 enum Network {
   MAINNET = 'mainnet',
-  ROPSTEN = 'ropsten'
+  ROPSTEN = 'ropsten',
+  GOERLI = 'goerli',
+  SEPOLIA = 'sepolia'
 }
+
 enum ContractName {
   MANAToken = 'MANAToken',
   ERC721Bid = 'ERC721Bid',
   LANDProxy = 'LANDProxy',
   EstateProxy = 'EstateProxy',
   MarketplaceProxy = 'MarketplaceProxy',
-  DCLRegistrar = 'DCLRegistrar'
+  DCLRegistrar = 'DCLRegistrar',
+  DCLControllerV2 = 'DCLControllerV2'
 }
+
 type ContractsResponse = Record<Network, Record<ContractName, string>>
 
 const startBlockByNetwork: Record<Network, Record<ContractName, number>> = {
@@ -24,7 +29,8 @@ const startBlockByNetwork: Record<Network, Record<ContractName, number>> = {
     LANDProxy: 4944642,
     EstateProxy: 6236547,
     MarketplaceProxy: 6496012,
-    DCLRegistrar: 9412979
+    DCLRegistrar: 9412979,
+    DCLControllerV2: 16977347
   },
   [Network.ROPSTEN]: {
     MANAToken: 1891200,
@@ -32,7 +38,26 @@ const startBlockByNetwork: Record<Network, Record<ContractName, number>> = {
     LANDProxy: 2482847,
     EstateProxy: 3890399,
     MarketplaceProxy: 4202120,
-    DCLRegistrar: 7170497
+    DCLRegistrar: 7170497,
+    DCLControllerV2: 7170497
+  },
+  [Network.GOERLI]: {
+    MANAToken: 4045806,
+    ERC721Bid: 7098754,
+    LANDProxy: 7059003,
+    EstateProxy: 7059236,
+    MarketplaceProxy: 7097561,
+    DCLRegistrar: 7098224,
+    DCLControllerV2: 8767204
+  },
+  [Network.SEPOLIA]: {
+    MANAToken: 3831216,
+    ERC721Bid: 3831237,
+    LANDProxy: 3831219,
+    EstateProxy: 3831232,
+    MarketplaceProxy: 3831225,
+    DCLRegistrar: 3831239,
+    DCLControllerV2: 3831242
   }
 }
 
@@ -140,7 +165,7 @@ class Parser {
   replaceAddresses(text = this.text) {
     for (const placeholder of this.getPlaceholders('address')) {
       const contractName = this.getPlaceholderValue(placeholder)
-      const address = this.ethereum.getAddress(contractName)
+      const address = this.ethereum.getAddress(contractName).toLowerCase()
       text = text.replace(placeholder, address)
     }
     return text

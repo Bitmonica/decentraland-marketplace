@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Page, Loader, Center } from 'decentraland-ui'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
 import { AddressProvider } from 'decentraland-dapps/dist/containers/AddressProvider'
@@ -24,19 +25,20 @@ const AccountPage = ({
 }: Props) => {
   const isCurrentAccount =
     (!addressInUrl || wallet?.address === addressInUrl) && !viewAsGuest
+  const { pathname, search } = useLocation()
 
   // Redirect to signIn if trying to access current account without a wallet
   useEffect(() => {
     if (!addressInUrl && !isConnecting && !wallet) {
-      onRedirect(locations.signIn())
+      onRedirect(locations.signIn(`${pathname}${search}`))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addressInUrl, isConnecting, wallet, onRedirect])
 
   return (
     <div className="AccountPage">
       <Navbar isFullscreen />
       <Navigation
-        isFullscreen={!isCurrentAccount || isFullscreen}
         activeTab={isCurrentAccount ? NavigationTab.MY_STORE : undefined}
       />
       <AddressProvider input={addressInUrl || wallet?.address || ''}>
@@ -59,7 +61,6 @@ const AccountPage = ({
                   vendor={vendor}
                   address={address}
                   view={isCurrentAccount ? View.CURRENT_ACCOUNT : View.ACCOUNT}
-                  isFullscreen={Boolean(isFullscreen)}
                 />
               </>
             ) : null}

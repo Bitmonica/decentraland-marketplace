@@ -2,19 +2,19 @@
   display: inline-flex;
   align-items: center;
   text-transform: uppercase;
-  padding: 4px 12px;
+  padding: 2px 8px;
   border-radius: 5px;
   cursor: pointer;
   background-color: #37333d;
 }
 
 .IconBadge .text {
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .IconBadge .icon {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   margin-right: 10px;
   background-position: center;
   background-repeat: no-repeat;
@@ -104,4 +104,39 @@
 
 .IconBadge .skin {
   background-image: url(../../../images/wearables/SkinIcon.svg);
+}
+
+.IconBadge .hands_wear {
+  background-size: contain;
+  background-image: url(../../../images/wearables/HandsIcon.svg);
+}
+
+.IconBadge .play-once {
+  background-image: url(../../../images/emotes/play-once.svg);
+  width: 19px;
+  filter: brightness(0) invert(1);
+}
+
+
+.IconBadge .play-loop {
+  background-image: url(../../../images/emotes/play-loop.svg);
+  width: 19px;
+  filter: brightness(0) invert(1);
+}
+
+.IconBadge .sound {
+  background-image: url(../../../images/emotes/sound.svg);
+  width: 19px;
+}
+
+.IconBadge .props {
+  background-image: url(../../../images/emotes/props.svg);
+  background-size: contain;
+  width: 19px;
+}
+
+.IconBadge .sparkles {
+  filter: brightness(0) invert(1);
+  background-image: url(../../../images/sparkles.svg);
+  background-size: cover;
 }

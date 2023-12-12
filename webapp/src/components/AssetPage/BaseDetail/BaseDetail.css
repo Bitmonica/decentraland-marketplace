@@ -67,7 +67,6 @@
 
 .BaseDetail .PageHeader > .AssetImage {
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .BaseDetail .PageHeader > .AssetImage .ens-subdomain {
@@ -77,10 +76,6 @@
 
 .BaseDetail .PageHeader > .AssetImage .ens-subdomain .name {
   padding: 25px;
-}
-
-.BaseDetail .ui.container > div {
-  margin-bottom: 48px;
 }
 
 /* Override ui stats */
@@ -93,6 +88,10 @@
   display: block;
   margin-right: 24px;
   width: unset;
+}
+
+.BaseDetail .below {
+  margin-top: 20px;
 }
 
 @media (max-width: 768px) {
@@ -110,4 +109,17 @@
 
 .BaseDetail .ui.button + .ui.button {
   margin-left: unset;
+}
+
+.BaseDetail .action-box {
+  width: 320px;
+}
+
+@media (max-width: 768px) {
+  .BaseDetail .info > .left {
+    margin-right: 0;
+  }
+  .BaseDetail .action-box {
+    width: 100%;
+  }
 }

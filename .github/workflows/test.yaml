@@ -10,11 +10,17 @@ jobs:
         working-directory: ./webapp
     steps:
       - uses: actions/checkout@master
-      - name: Use Node.js 14.x
+      - name: Use Node.js 16.x
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Install
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       - name: Test
-        run: npm run test
+        run: npm run test:coverage
+      - name: report coverage
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          base-path: ./webapp
+          path-to-lcov: ./webapp/coverage/lcov.info

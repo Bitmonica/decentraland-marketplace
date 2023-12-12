@@ -1,13 +1,57 @@
 import { createSelector } from 'reselect'
 import { createMatchSelector } from 'connected-react-router'
 import { Item } from '@dcl/schemas'
+import { isLoadingType } from 'decentraland-dapps/dist/modules/loading/selectors'
+import { AuthorizationStepStatus } from 'decentraland-dapps/dist/containers/withAuthorizedAction/AuthorizationModal'
 import { locations } from '../routing/locations'
 import { RootState } from '../reducer'
+import {
+  BUY_ITEM_REQUEST,
+  FETCH_COLLECTION_ITEMS_REQUEST,
+  FETCH_ITEM_REQUEST,
+  FetchCollectionItemsRequestAction
+} from './actions'
 
 export const getState = (state: RootState) => state.item
 export const getData = (state: RootState) => getState(state).data
 export const getError = (state: RootState) => getState(state).error
 export const getLoading = (state: RootState) => getState(state).loading
+
+export const getMintItemStatus = (state: RootState) => {
+  if (isLoadingType(getLoading(state), BUY_ITEM_REQUEST)) {
+    return AuthorizationStepStatus.WAITING
+  }
+
+  if (getError(state)) {
+    return AuthorizationStepStatus.ERROR
+  }
+
+  return AuthorizationStepStatus.PENDING
+}
+
+export const isFetchingItem = (
+  state: RootState,
+  contractAddress: string,
+  tokenId: string
+) =>
+  getLoading(state).find(
+    action =>
+      action.type === FETCH_ITEM_REQUEST &&
+      action.payload.contractAddress === contractAddress &&
+      action.payload.tokenId === tokenId
+  ) !== undefined
+
+export const isFetchingItemsOfCollection = (
+  state: RootState,
+  contractAddress: string
+) =>
+  getLoading(state).find(
+    action =>
+      action.type === FETCH_COLLECTION_ITEMS_REQUEST &&
+      (action as FetchCollectionItemsRequestAction).payload?.contractAddresses?.includes(
+        contractAddress
+      )
+  ) !== undefined
 
 export const getItems = createSelector<
   RootState,

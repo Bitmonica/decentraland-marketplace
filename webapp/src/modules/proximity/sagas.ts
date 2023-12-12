@@ -1,4 +1,7 @@
 import { takeEvery, call, put } from 'redux-saga/effects'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { isErrorWithMessage } from '../../lib/error'
+import { FETCH_TILES_SUCCESS, FetchTilesSuccessAction } from '../tile/actions'
 import {
   FETCH_PROXIMITY_REQUEST,
   FetchProximityRequestAction,
@@ -6,7 +9,6 @@ import {
   fetchProximityFailure,
   fetchProximityRequest
 } from './actions'
-import { FETCH_TILES_SUCCESS, FetchTilesSuccessAction } from '../tile/actions'
 import { Proximity } from './types'
 
 export function* proximitySaga() {
@@ -17,12 +19,16 @@ export function* proximitySaga() {
 function* handleFetchProximityRequest(_action: FetchProximityRequestAction) {
   try {
     const proximity: Record<string, Proximity> = yield call(async () => {
-      const resp = await fetch('/proximity.json')
+      const resp = await fetch(process.env.PUBLIC_URL + '/proximity.json')
       return resp.json()
     })
     yield put(fetchProximitySuccess(proximity))
   } catch (error) {
-    yield put(fetchProximityFailure(error.message))
+    yield put(
+      fetchProximityFailure(
+        isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+      )
+    )
   }
 }
 

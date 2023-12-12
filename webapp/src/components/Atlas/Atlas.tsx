@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { NFTCategory } from '@dcl/schemas'
+import { Button, Popup as UIPopup } from 'decentraland-ui'
+import { NFTCategory, RentalStatus } from '@dcl/schemas'
+import classNames from 'classnames'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
 import {
   Atlas as AtlasComponent,
   AtlasTile,
@@ -7,10 +10,10 @@ import {
   Layer
 } from 'decentraland-ui'
 import { locations } from '../../modules/routing/locations'
+import { isErrorWithMessage } from '../../lib/error'
 import { nftAPI } from '../../modules/vendor/decentraland/nft/api'
 import { Props, Tile } from './Atlas.types'
 import { VendorName } from '../../modules/vendor'
-import { getContract } from '../../modules/contract/utils'
 import { NFT } from '../../modules/nft/types'
 import Popup from './Popup'
 import './Atlas.css'
@@ -24,12 +27,20 @@ const Atlas: React.FC<Props> = (props: Props) => {
     isEstate,
     withNavigation,
     nfts,
+    nftsOnRent,
     withPopup,
     showOnSale,
-    tilesByEstateId
+    showForRent,
+    showOwned,
+    tilesByEstateId,
+    withMapColorsInfo,
+    withZoomControls,
+    getContract,
+    children
   } = props
 
   const [showPopup, setShowPopup] = useState(false)
+  const [isInfoPopupOpen, setIsInfoPopupOpen] = useState(false)
   const [hoveredTile, setHoveredTile] = useState<Tile | null>(null)
   const [mouseX, setMouseX] = useState(-1)
   const [mouseY, setMouseY] = useState(-1)
@@ -46,36 +57,60 @@ const Atlas: React.FC<Props> = (props: Props) => {
     [props.selection]
   )
 
-  const userTiles = useMemo(
-    () =>
-      nfts.reduce((lands, nft) => {
-        if (nft.vendor === VendorName.DECENTRALAND) {
-          switch (nft.category) {
-            case NFTCategory.PARCEL: {
-              const parcel = (nft as NFT<VendorName.DECENTRALAND>).data.parcel!
-              lands.set(getCoords(parcel.x, parcel.y), {
-                color: Color.SUMMER_RED
-              })
-              break
-            }
-            case NFTCategory.ESTATE: {
-              const estateId = nft.tokenId
-              if (estateId in tilesByEstateId) {
-                for (const tile of tilesByEstateId[estateId]) {
-                  lands.set(getCoords(tile.x, tile.y), {
-                    color: Color.SUMMER_RED,
-                    top: !!tile.top,
-                    left: !!tile.left,
-                    topLeft: !!tile.topLeft
-                  })
-                }
+  const setLand = useCallback(
+    (lands, nft, color = Color.SUMMER_RED) => {
+      if (nft.vendor === VendorName.DECENTRALAND) {
+        switch (nft.category) {
+          case NFTCategory.PARCEL: {
+            const parcel = (nft as NFT<VendorName.DECENTRALAND>).data.parcel!
+            lands.set(getCoords(parcel.x, parcel.y), {
+              color
+            })
+            break
+          }
+          case NFTCategory.ESTATE: {
+            const estateId = nft.tokenId
+            if (estateId in tilesByEstateId) {
+              for (const tile of tilesByEstateId[estateId]) {
+                lands.set(getCoords(tile.x, tile.y), {
+                  color,
+                  top: !!tile.top,
+                  left: !!tile.left,
+                  topLeft: !!tile.topLeft
+                })
               }
             }
           }
         }
-        return lands
-      }, new Map<string, ReturnType<Layer>>()),
-    [nfts, tilesByEstateId]
+      }
+      return lands
+    },
+    [tilesByEstateId]
+  )
+
+  const userTiles = useMemo(
+    () =>
+      nfts.reduce(
+        (lands, nft) => setLand(lands, nft),
+        new Map<string, ReturnType<Layer>>()
+      ),
+    [nfts, setLand]
+  )
+
+  const userRentedTiles = useMemo(
+    () =>
+      nftsOnRent.reduce(
+        (lands, [nft, rental]) =>
+          setLand(
+            lands,
+            nft,
+            rental.status === RentalStatus.EXECUTED
+              ? Color.SUNISH
+              : Color.SUMMER_RED
+          ),
+        new Map<string, ReturnType<Layer>>()
+      ),
+    [nftsOnRent, setLand]
   )
 
   const isSelected = useCallback(
@@ -102,11 +137,15 @@ const Atlas: React.FC<Props> = (props: Props) => {
     [selection, tiles, isEstate]
   )
 
-  const forSaleLayer: Layer = useCallback(
-    (x, y) => {
+  const forSaleOrRentLayer: Layer = useCallback(
+    (x: number, y: number) => {
       const key = getCoords(x, y)
       const tile = tiles[key] as AtlasTile & { price?: string }
-      if (tile && 'price' in tile) {
+      if (
+        tile &&
+        (('price' in tile && showOnSale) ||
+          ('rentalPricePerDay' in tile && showForRent))
+      ) {
         return {
           color: '#00d3ff',
           left: !!tile.left,
@@ -116,26 +155,37 @@ const Atlas: React.FC<Props> = (props: Props) => {
       }
       return null
     },
-    [tiles]
+    [tiles, showOnSale, showForRent]
   )
 
   const selectedStrokeLayer: Layer = useCallback(
-    (x, y) => {
+    (x: number, y: number) => {
       return isSelected(x, y) ? { color: '#ff0044', scale: 1.4 } : null
     },
     [isSelected]
   )
 
   const selectedFillLayer: Layer = useCallback(
-    (x, y) => {
+    (x: number, y: number) => {
       return isSelected(x, y) ? { color: '#ff9990', scale: 1.2 } : null
     },
     [isSelected]
   )
 
+  const allUserTiles = useMemo(
+    () => new Map([...userTiles].concat([...userRentedTiles])),
+    [userRentedTiles, userTiles]
+  )
+
   const userLayer: Layer = useCallback(
-    (x, y) => userTiles.get(getCoords(x, y)) || null,
-    [userTiles]
+    (x: number, y: number) => {
+      const tile = allUserTiles.get(getCoords(x, y))
+      if (showOwned && tile) {
+        return tile
+      }
+      return null
+    },
+    [allUserTiles, showOwned]
   )
 
   const handleClick = useCallback(
@@ -147,26 +197,30 @@ const Atlas: React.FC<Props> = (props: Props) => {
       if (!tile) {
         return
       }
+
       if (tile.estate_id) {
         const estates = getContract({
           category: NFTCategory.ESTATE
         })
-        onNavigate(locations.nft(estates.address, tile.estate_id))
+        estates && onNavigate(locations.nft(estates.address, tile.estate_id))
       } else {
         try {
           const land = getContract({
             category: NFTCategory.PARCEL
           })
           const tokenId = await nftAPI.fetchTokenId(tile.x, tile.y)
-          onNavigate(locations.nft(land.address, tokenId))
+          land && onNavigate(locations.nft(land.address, tokenId))
         } catch (error) {
+          const errorMessage = isErrorWithMessage(error)
+            ? error.message
+            : t('global.unknown_error')
           console.warn(
-            `Couldn't fetch parcel ${tile.x},${tile.y}: ${error.message}`
+            `Couldn't fetch parcel ${tile.x},${tile.y}: ${errorMessage}`
           )
         }
       }
     },
-    [withNavigation, onNavigate, tiles]
+    [withNavigation, tiles, getContract, onNavigate]
   )
 
   const handleHover = useCallback(
@@ -178,6 +232,19 @@ const Atlas: React.FC<Props> = (props: Props) => {
       }
       const id = getCoords(x, y)
       const tile = tiles[id]
+      const tileRent = tile
+        ? nftsOnRent.find(([nft]) =>
+            nft.data.parcel
+              ? Number(nft.data.parcel.x) === tile.x &&
+                Number(nft.data.parcel.y) === tile.y
+              : null
+          )
+        : null
+
+      if (tile && tileRent && tileRent[1].lessor) {
+        tile.owner = tileRent[1].lessor
+      }
+
       if (tile && !showPopup) {
         setShowPopup(true)
         setHoveredTile(tile)
@@ -191,7 +258,7 @@ const Atlas: React.FC<Props> = (props: Props) => {
         setShowPopup(false)
       }
     },
-    [hoveredTile, showPopup, tiles, withPopup, selection]
+    [withPopup, selection, tiles, showPopup, hoveredTile, nftsOnRent]
   )
 
   const handleHidePopup = useCallback(() => {
@@ -230,6 +297,18 @@ const Atlas: React.FC<Props> = (props: Props) => {
     }
   }, [withPopup, showPopup, mouseX, mouseY])
 
+  const handleInfoPopupOpen = useCallback(() => setIsInfoPopupOpen(true), [
+    setIsInfoPopupOpen
+  ])
+
+  const handleInfoPopupClose = useCallback(
+    (evt: React.MouseEvent) => {
+      evt.stopPropagation()
+      setIsInfoPopupOpen(false)
+    },
+    [setIsInfoPopupOpen]
+  )
+
   // layers
   const layers = [
     userLayer,
@@ -238,18 +317,63 @@ const Atlas: React.FC<Props> = (props: Props) => {
     selectedFillLayer
   ]
 
-  if (showOnSale) {
-    layers.unshift(forSaleLayer)
+  if (showOnSale || showForRent) {
+    layers.unshift(forSaleOrRentLayer)
   }
 
   return (
     <div className="atlas-wrapper" onMouseLeave={handleHidePopup}>
+      {withMapColorsInfo && (
+        <UIPopup
+          content={
+            <div className="atlas-references-container">
+              <h3 className="references-title">
+                {t('nft_filters.map.map_colors')}
+              </h3>
+              <div className="atlas-references">
+                <span className="reference plaza">
+                  {t('nft_filters.map.plaza')}
+                </span>
+                <span className="reference owned">
+                  {t('nft_filters.map.owned_land')}
+                </span>
+                <span className="reference rented">
+                  {t('nft_filters.map.rented_land')}
+                </span>
+                <span className="reference sale">
+                  {t('nft_filters.map.sale_or_rent')}
+                </span>
+                <span className="reference taken">
+                  {t('nft_filters.map.taken')}
+                </span>
+              </div>
+            </div>
+          }
+          position="top right"
+          onClose={handleInfoPopupClose}
+          onOpen={handleInfoPopupOpen}
+          trigger={
+            <Button
+              primary
+              className={classNames('atlas-info-button', {
+                'atlas-info-open': isInfoPopupOpen
+              })}
+              aria-label="info"
+              tabIndex={0}
+            >
+              <span aria-label="info-icon" className="info-icon" />
+            </Button>
+          }
+          on="click"
+        />
+      )}
       <AtlasComponent
         {...props}
         tiles={tiles}
         onClick={handleClick}
         onHover={handleHover}
         layers={layers}
+        withZoomControls={withZoomControls}
       />
       {hoveredTile ? (
         <Popup
@@ -260,12 +384,15 @@ const Atlas: React.FC<Props> = (props: Props) => {
           position={x > window.innerWidth - 280 ? 'left' : 'right'}
         />
       ) : null}
+      {children}
     </div>
   )
 }
 
 Atlas.defaultProps = {
-  showOnSale: true
+  showOnSale: true,
+  showForRent: true,
+  showOwned: true
 }
 
 export default Atlas

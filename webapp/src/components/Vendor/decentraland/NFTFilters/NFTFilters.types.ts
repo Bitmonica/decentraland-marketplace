@@ -1,27 +1,31 @@
 import { Dispatch } from 'redux'
-import { Network, Rarity } from '@dcl/schemas'
+import { EmotePlayMode, GenderFilterOption, Network, Rarity, WearableGender } from '@dcl/schemas'
 import { SortBy } from '../../../../modules/routing/types'
 import {
   browse,
   clearFilters,
   ClearFiltersAction
 } from '../../../../modules/routing/actions'
-import { WearableGender } from '../../../../modules/nft/wearable/types'
+import { Section } from '../../../../modules/vendor/routing/types'
 import { AssetType } from '../../../../modules/asset/types'
+import { View } from '../../../../modules/ui/types'
 
 export type Props = {
   assetType: AssetType
   count?: number
-  section: string
+  section: Section
+  view?: View
   sortBy?: SortBy
   search: string
   onlyOnSale?: boolean
+  onlyOnRent?: boolean
   onlySmart?: boolean
   isMap?: boolean
   rarities: Rarity[]
-  wearableGenders: WearableGender[]
+  wearableGenders: (WearableGender | GenderFilterOption)[]
   contracts: string[]
   network?: Network
+  emotePlayMode?: EmotePlayMode[]
   hasFiltersEnabled: boolean
   onBrowse: typeof browse
   onClearFilters: typeof clearFilters
@@ -29,18 +33,21 @@ export type Props = {
 
 export type MapStateProps = Pick<
   Props,
+  | 'view'
   | 'assetType'
   | 'count'
   | 'section'
   | 'sortBy'
   | 'search'
   | 'onlyOnSale'
+  | 'onlyOnRent'
   | 'onlySmart'
   | 'isMap'
   | 'rarities'
   | 'wearableGenders'
   | 'contracts'
   | 'network'
+  | 'emotePlayMode'
   | 'hasFiltersEnabled'
 >
 export type MapDispatchProps = Pick<Props, 'onClearFilters'>

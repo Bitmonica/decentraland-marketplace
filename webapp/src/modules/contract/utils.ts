@@ -1,22 +1,68 @@
-import { VendorFactory } from '../vendor/VendorFactory'
-import { VendorName } from '../vendor/types'
+import { Network, NFTCategory } from '@dcl/schemas'
+import { getChainIdByNetwork } from 'decentraland-dapps/dist/lib/eth'
+import { Authorization } from 'decentraland-dapps/dist/modules/authorization/types'
+import { NFT } from '../nft/types'
+import { VendorName } from '../vendor'
 import { Contract } from '../vendor/services'
 
-export let contracts: Contract[] = []
+export function upsertContracts(
+  storedContracts: Contract[],
+  newContracts: Contract[]
+) {
+  const contractsByAddressAndChain = storedContracts.reduce(
+    (map, contract) => map.set(getContractKey(contract), { ...contract }),
+    new Map<string, Contract>()
+  )
 
-export async function buildContracts() {
-  const vendors = Object.values(VendorName).map(VendorFactory.build)
+  newContracts.forEach(contract => {
+    contractsByAddressAndChain.set(getContractKey(contract), {
+      ...contract,
+      address: contract.address.toLowerCase()
+    })
+  })
 
-  for (const vendor of vendors) {
-    const { contractService } = vendor
+  return Array.from(contractsByAddressAndChain.values())
+}
 
-    await contractService.build()
+export function getContractKey(contract: Contract) {
+  return `${contract.address.toLowerCase()}-${contract.chainId}`
+}
 
-    contracts = [...contracts, ...contractService.getContracts()]
+export function getContractKeyFromNFT(nft: NFT) {
+  return `${nft.contractAddress.toLowerCase()}-${nft.chainId}`
+}
+
+export function getAuthorizationKey({
+  address,
+  authorizedAddress,
+  contractAddress,
+  chainId
+}: Authorization) {
+  return `${address}-${authorizedAddress}-${contractAddress}-${chainId}`
+}
+
+export const STUB_MATIC_COLLECTION_CONTRACT_NAME =
+  'Stub Matic Collection Contract Name'
+
+export function getStubMaticCollectionContract(address: string) {
+  return {
+    address: address.toLowerCase(),
+    category: NFTCategory.WEARABLE,
+    chainId: getChainIdByNetwork(Network.MATIC),
+    network: Network.MATIC,
+    vendor: VendorName.DECENTRALAND,
+    name: STUB_MATIC_COLLECTION_CONTRACT_NAME
   }
 }
 
-export function getContract(query: Partial<Contract>): Contract {
+export function isStubMaticCollectionContract(contract: Contract) {
+  return (
+    contract.name === STUB_MATIC_COLLECTION_CONTRACT_NAME &&
+    contract.network === Network.MATIC
+  )
+}
+
+export function getContractByParams(contracts: Contract[], query: Partial<Contract>) {
   const found = contracts.find(contract =>
     Object.keys(query).every(
       key =>
@@ -24,8 +70,6 @@ export function getContract(query: Partial<Contract>): Contract {
         contract[key as keyof Contract]?.toString().toLowerCase()
     )
   )
-  if (!found) {
-    throw new Error(`Contract not found, query=${JSON.stringify(query)}`)
-  }
-  return found
+
+  return found || null
 }

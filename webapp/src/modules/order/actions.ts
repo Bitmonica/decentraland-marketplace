@@ -1,11 +1,16 @@
 import { action } from 'typesafe-actions'
-import { Order } from '@dcl/schemas'
-import { buildTransactionPayload } from 'decentraland-dapps/dist/modules/transaction/utils'
+import { Order, OrderFilters } from '@dcl/schemas'
+import {
+  buildTransactionPayload,
+  buildTransactionWithFromPayload,
+  buildTransactionWithReceiptPayload
+} from 'decentraland-dapps/dist/modules/transaction/utils'
+import { NFTPurchase } from 'decentraland-dapps/dist/modules/gateway/types'
 import { ErrorCode } from 'decentraland-transactions'
-
 import { NFT } from '../nft/types'
 import { getAssetName } from '../asset/utils'
 import { formatWeiMANA } from '../../lib/mana'
+import { LegacyOrderFragment } from './types'
 
 // Create Order (aka Sell)
 
@@ -53,17 +58,24 @@ export type CreateOrderFailureAction = ReturnType<typeof createOrderFailure>
 export const EXECUTE_ORDER_REQUEST = '[Request] Execute Order'
 export const EXECUTE_ORDER_SUCCESS = '[Success] Execute Order'
 export const EXECUTE_ORDER_FAILURE = '[Failure] Execute Order'
+export const EXECUTE_ORDER_TRANSACTION_SUBMITTED =
+  '[Submitted transaction] Execute Order'
 
 export const executeOrderRequest = (
   order: Order,
   nft: NFT,
-  fingerprint?: string
-) => action(EXECUTE_ORDER_REQUEST, { order, nft, fingerprint })
-export const executeOrderSuccess = (order: Order, nft: NFT, txHash: string) =>
-  action(EXECUTE_ORDER_SUCCESS, {
+  fingerprint?: string,
+  silent?: boolean
+) => action(EXECUTE_ORDER_REQUEST, { order, nft, fingerprint, silent })
+export const executeOrderTransactionSubmitted = (
+  order: Order,
+  nft: NFT,
+  txHash: string
+) =>
+  action(EXECUTE_ORDER_TRANSACTION_SUBMITTED, {
     order,
     nft,
-    ...buildTransactionPayload(nft.chainId, txHash, {
+    ...buildTransactionWithReceiptPayload(nft.chainId, txHash, {
       tokenId: nft.tokenId,
       contractAddress: nft.contractAddress,
       network: nft.network,
@@ -71,16 +83,62 @@ export const executeOrderSuccess = (order: Order, nft: NFT, txHash: string) =>
       price: formatWeiMANA(order.price)
     })
   })
+export const executeOrderSuccess = (txHash: string, nft: NFT) =>
+  action(EXECUTE_ORDER_SUCCESS, { txHash, nft })
 export const executeOrderFailure = (
   order: Order,
   nft: NFT,
   error: string,
-  errorCode?: ErrorCode
-) => action(EXECUTE_ORDER_FAILURE, { order, nft, error, errorCode })
+  errorCode?: ErrorCode,
+  silent?: boolean
+) => action(EXECUTE_ORDER_FAILURE, { order, nft, error, errorCode, silent })
 
 export type ExecuteOrderRequestAction = ReturnType<typeof executeOrderRequest>
 export type ExecuteOrderSuccessAction = ReturnType<typeof executeOrderSuccess>
+export type ExecuteOrderTransactionSubmittedAction = ReturnType<
+  typeof executeOrderTransactionSubmitted
+>
 export type ExecuteOrderFailureAction = ReturnType<typeof executeOrderFailure>
+
+// Execute Order With Card (aka Buy with Card)
+export const EXECUTE_ORDER_WITH_CARD_REQUEST =
+  '[Request] Execute Order With Card'
+export const EXECUTE_ORDER_WITH_CARD_SUCCESS =
+  '[Success] Execute Order With Card'
+export const EXECUTE_ORDER_WITH_CARD_FAILURE =
+  '[Failure] Execute Order With Card'
+
+export const executeOrderWithCardRequest = (nft: NFT) =>
+  action(EXECUTE_ORDER_WITH_CARD_REQUEST, { nft })
+
+export const executeOrderWithCardSuccess = (
+  purchase: NFTPurchase,
+  nft: NFT,
+  txHash: string
+) =>
+  action(EXECUTE_ORDER_WITH_CARD_SUCCESS, {
+    purchase,
+    nft,
+    ...buildTransactionWithFromPayload(nft.chainId, txHash, purchase.address, {
+      tokenId: nft.tokenId,
+      contractAddress: nft.contractAddress,
+      network: nft.network,
+      name: getAssetName(nft),
+      price: purchase.nft.cryptoAmount.toString()
+    })
+  })
+export const executeOrderWithCardFailure = (error: string) =>
+  action(EXECUTE_ORDER_WITH_CARD_FAILURE, { error })
+
+export type ExecuteOrderWithCardRequestAction = ReturnType<
+  typeof executeOrderWithCardRequest
+>
+export type ExecuteOrderWithCardSuccessAction = ReturnType<
+  typeof executeOrderWithCardSuccess
+>
+export type ExecuteOrderWithCardFailureAction = ReturnType<
+  typeof executeOrderWithCardFailure
+>
 
 // Cancel Order (aka Cancel Sale)
 
@@ -112,3 +170,38 @@ export const cancelOrderFailure = (
 export type CancelOrderRequestAction = ReturnType<typeof cancelOrderRequest>
 export type CancelOrderSuccessAction = ReturnType<typeof cancelOrderSuccess>
 export type CancelOrderFailureAction = ReturnType<typeof cancelOrderFailure>
+
+export const CLEAR_ORDER_ERRORS = 'Clear Order Errors'
+
+export const clearOrderErrors = () => action(CLEAR_ORDER_ERRORS)
+
+export type ClearOrderErrorsAction = ReturnType<typeof clearOrderErrors>
+
+// Fetch orders
+export const FETCH_LEGACY_ORDERS_REQUEST = '[Request] Fetch Legacy Orders'
+export const FETCH_LEGACY_ORDERS_SUCCESS = '[Success] Fetch Legacy Orders'
+export const FETCH_LEGACY_ORDERS_FAILURE = '[Failure] Fetch Legacy Orders'
+
+export const fetchOrdersRequest = (address: string, filters?: OrderFilters) =>
+  action(FETCH_LEGACY_ORDERS_REQUEST, { address, filters })
+
+export const fetchOrdersSuccess = (orders: LegacyOrderFragment[]) =>
+  action(FETCH_LEGACY_ORDERS_SUCCESS, {
+    orders
+  })
+
+export const fetchOrdersFailure = (
+  address: string,
+  error: string,
+  errorCode?: ErrorCode
+) => action(FETCH_LEGACY_ORDERS_FAILURE, { address, error, errorCode })
+
+export type FetchLegacyOrdersRequestAction = ReturnType<
+  typeof fetchOrdersRequest
+>
+export type FetchLegacyOrdersSuccessAction = ReturnType<
+  typeof fetchOrdersSuccess
+>
+export type FetchLegacyOrdersFailureAction = ReturnType<
+  typeof fetchOrdersFailure
+>

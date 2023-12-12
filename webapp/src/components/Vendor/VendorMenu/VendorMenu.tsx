@@ -39,10 +39,12 @@ const VendorMenu = (props: Props) => {
       setCurrentCount(count)
     } else {
       const { nftService } = VendorFactory.build(vendor)
-      const newCount = await nftService.count({ address })
+      const newCount = await nftService.count({
+        address
+      })
       setCurrentCount(newCount)
     }
-  }, [isCurrentVendor, vendor, count, address, setCurrentCount])
+  }, [isCurrentVendor, count, vendor, address])
 
   const subtitle =
     currentCount === undefined
@@ -78,7 +80,6 @@ const VendorMenu = (props: Props) => {
         {isOpen ? (
           <NFTSections
             vendor={vendor}
-            address={address}
             section={isCurrentVendor ? section : undefined}
             onSectionClick={onClick}
           />

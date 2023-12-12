@@ -1,6 +1,7 @@
 import { SaleFilters } from '@dcl/schemas'
 import { BaseAPI } from 'decentraland-dapps/dist/lib/api'
 import { NFT_SERVER_URL } from '../nft'
+import { retryParams } from '../utils'
 import { SaleResponse } from './types'
 
 class SaleAPI extends BaseAPI {
@@ -15,11 +16,16 @@ class SaleAPI extends BaseAPI {
     const entries = Object.entries(filters)
 
     for (let [key, value] of entries) {
-      queryParams.append(key, value.toString())
+      // when passing categories as an array, it should be added as a query param multiple times
+      if (key === 'categories' && Array.isArray(value)) {
+        value.forEach(v => queryParams.append('category', v))
+      } else {
+        queryParams.append(key, value.toString())
+      }
     }
 
     return queryParams.toString()
   }
 }
 
-export const saleAPI = new SaleAPI(NFT_SERVER_URL)
+export const saleAPI = new SaleAPI(NFT_SERVER_URL, retryParams)

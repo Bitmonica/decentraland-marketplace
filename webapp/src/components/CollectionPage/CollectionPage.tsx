@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useCallback, useState } from 'react'
+import { NFTCategory } from '@dcl/schemas'
 import {
   Back,
   Column,
-  Narrow,
   Page,
   Row,
   Section,
@@ -12,26 +12,50 @@ import {
   Color,
   Button,
   Loader,
-  Table,
-  Dropdown,
-  Mobile,
-  NotMobile
+  useMobileMediaQuery
 } from 'decentraland-ui'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { getBuilderCollectionDetailUrl } from '../../modules/collection/utils'
+import { formatWeiMANA } from '../../lib/mana'
 import { Navbar } from '../Navbar'
 import { Footer } from '../Footer'
-import { Navigation } from '../Navigation'
-import { Props } from './CollectionPage.types'
-import { Mana } from '../Mana'
-import { formatWeiMANA } from '../../lib/mana'
-import { Rarity } from '@dcl/schemas'
 import CollectionProvider from '../CollectionProvider'
-import { getBuilderCollectionDetailUrl } from '../../modules/collection/utils'
-import AssetCell from '../OnSaleList/AssetCell'
+import { Navigation } from '../Navigation'
+import AssetCell from '../OnSaleOrRentList/AssetCell'
+import { Mana } from '../Mana'
+import TableContainer from '../Table/TableContainer'
+import { TableContent } from '../Table/TableContent'
+import { formatDataToTable } from './utils'
+import { Props } from './CollectionPage.types'
 import styles from './CollectionPage.module.css'
+
+const WEARABLES_TAB = 'wearables'
+const EMOTES_TAB = 'emotes'
 
 const CollectionPage = (props: Props) => {
   const { contractAddress, currentAddress, onBack } = props
+
+  const isMobile = useMobileMediaQuery()
+
+  const tabList = [
+    {
+      value: WEARABLES_TAB,
+      displayValue: t('home_page.recently_sold.tabs.wearable')
+    },
+    {
+      value: EMOTES_TAB,
+      displayValue: t('home_page.recently_sold.tabs.emote')
+    }
+  ]
+
+  const [tab, setTab] = useState<string>(WEARABLES_TAB)
+
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      setTab(tab)
+    },
+    [setTab]
+  )
 
   return (
     <div>
@@ -49,20 +73,44 @@ const CollectionPage = (props: Props) => {
               const builderCollectionUrl = getBuilderCollectionDetailUrl(
                 contractAddress
               )
+              const hasWearables = items?.some(
+                item => item.category === NFTCategory.WEARABLE
+              )
+              const hasEmotes = items?.some(
+                item => item.category === NFTCategory.EMOTE
+              )
+
+              const filteredItems = items?.filter(item => {
+                return hasWearables && hasEmotes
+                  ? tab === WEARABLES_TAB
+                    ? item.category === NFTCategory.WEARABLE
+                    : item.category === NFTCategory.EMOTE
+                  : items
+              })
+
+              const tableItems = formatDataToTable(
+                filteredItems,
+                isCollectionOwner,
+                isMobile
+              )
+
+              const showShowTabs = hasEmotes && hasWearables
 
               return isLoading ? (
                 <Loader size="massive" active />
-              ) : !collection || !items ? (
+              ) : !collection || !filteredItems ? (
                 <div>{t('collection_page.no_collection')}</div>
               ) : (
                 <>
                   <Section>
                     <Column>
-                      <Back absolute onClick={onBack} />
-                      <Narrow>
+                      <div className={styles.headerContainer}>
                         <Row stacked>
                           <Column>
                             <Row>
+                              <div className={styles.backBtnContainer}>
+                                <Back onClick={onBack} />
+                              </div>
                               <Header size="large">{collection.name}</Header>
                               {collection.isOnSale && (
                                 <Badge color={Color.SUMMER_RED}>
@@ -104,96 +152,34 @@ const CollectionPage = (props: Props) => {
                             </Column>
                           )}
                         </Row>
-                      </Narrow>
+                      </div>
                     </Column>
                   </Section>
                   <Section>
-                    <Narrow>
-                      <Table basic="very">
-                        <Table.Header>
-                          <NotMobile>
-                            <Table.Row>
-                              <Table.HeaderCell>
-                                {t('global.item')}
-                              </Table.HeaderCell>
-                              <Table.HeaderCell>
-                                {t('global.category')}
-                              </Table.HeaderCell>
-                              <Table.HeaderCell>
-                                {t('global.rarity')}
-                              </Table.HeaderCell>
-                              <Table.HeaderCell>
-                                {t('global.stock')}
-                              </Table.HeaderCell>
-                              <Table.HeaderCell>
-                                {t('global.price')}
-                              </Table.HeaderCell>
-                              {isCollectionOwner && <Table.HeaderCell />}
-                            </Table.Row>
-                          </NotMobile>
-                        </Table.Header>
-                        <Table.Body>
-                          <Mobile>
-                            {items.map(item => (
-                              <div key={item.id} className="mobile-row">
-                                <AssetCell asset={item} />
-                                <Mana network={item.network} inline>
-                                  {formatWeiMANA(item.price)}
-                                </Mana>
-                              </div>
-                            ))}
-                          </Mobile>
-                          <NotMobile>
-                            {items.map(item => (
-                              <Table.Row key={item.id} className={styles.row}>
-                                <Table.Cell>
-                                  <AssetCell asset={item} />
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {t(`global.${item.category}`)}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {t(`rarity.${item.rarity}`)}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {item.available.toLocaleString()}/
-                                  {Rarity.getMaxSupply(
-                                    item.rarity
-                                  ).toLocaleString()}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <Mana network={item.network} inline>
-                                    {formatWeiMANA(item.price)}
-                                  </Mana>
-                                </Table.Cell>
-                                {isCollectionOwner && (
-                                  <Table.Cell>
-                                    <Dropdown
-                                      className={styles.ellipsis}
-                                      icon="ellipsis horizontal"
-                                      direction="left"
-                                    >
-                                      <Dropdown.Menu>
-                                        <Dropdown.Item
-                                          text={t('collection_page.edit_price')}
-                                          as="a"
-                                          href={builderCollectionUrl}
-                                        />
-                                        <Dropdown.Item
-                                          text={t('collection_page.mint_item')}
-                                          as="a"
-                                          href={builderCollectionUrl}
-                                        />
-                                      </Dropdown.Menu>
-                                    </Dropdown>
-                                  </Table.Cell>
-                                )}
-                              </Table.Row>
-                            ))}
-                          </NotMobile>
-                        </Table.Body>
-                      </Table>
-                    </Narrow>
+                    <TableContainer
+                      tabsList={showShowTabs ? tabList : []}
+                      activeTab={tab}
+                      handleTabChange={(tab: string) => handleTabChange(tab)}
+                      children={
+                        <TableContent
+                          data={tableItems}
+                          isLoading={isLoading}
+                          empty={() => (
+                            <div>{t('collection_page.no_collection')}</div>
+                          )}
+                          mobileTableBody={filteredItems.map(item => (
+                            <div key={item.id} className="mobile-row">
+                              <AssetCell asset={item} />
+                              <Mana network={item.network} inline>
+                                {formatWeiMANA(item.price)}
+                              </Mana>
+                            </div>
+                          ))}
+                          total={0}
+                          hasHeaders={showShowTabs}
+                        />
+                      }
+                    />
                   </Section>
                 </>
               )

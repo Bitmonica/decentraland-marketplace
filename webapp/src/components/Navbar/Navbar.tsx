@@ -3,19 +3,40 @@ import { Navbar as BaseNavbar } from 'decentraland-dapps/dist/containers'
 
 import { locations } from '../../modules/routing/locations'
 import UserMenu from '../UserMenu'
+import UserInformation from '../UserInformation'
 import { Props } from './Navbar.types'
 import './Navbar.css'
 
 const Navbar = (props: Props) => {
-  const { pathname, onNavigate, isConnected } = props
+  const {
+    location,
+    onNavigate,
+    isConnected,
+    isNewNavbarDropdownEnabled
+  } = props
+  const { pathname, search } = location
 
   if (isConnected) {
-    props = { ...props, rightMenu: <UserMenu /> }
+    props = {
+      ...props,
+      rightMenu: <UserMenu />
+    }
+  }
+  if (isNewNavbarDropdownEnabled) {
+    props = {
+      ...props,
+      rightMenu: <UserInformation />
+    }
   }
 
   const handleOnSignIn = useCallback(() => {
-    onNavigate(locations.signIn())
-  }, [onNavigate])
+    const searchParams = new URLSearchParams(search)
+    const currentRedirectTo = searchParams.get('redirectTo')
+    const redirectTo = !currentRedirectTo
+      ? `${pathname}${search}`
+      : currentRedirectTo
+    onNavigate(locations.signIn(redirectTo))
+  }, [onNavigate, pathname, search])
 
   const handleOnClickAccount = useCallback(() => {
     onNavigate(locations.settings())

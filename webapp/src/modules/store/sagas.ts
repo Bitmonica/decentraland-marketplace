@@ -1,9 +1,11 @@
 import { call, put, select, takeEvery } from 'redux-saga/effects'
 import { LocationChangeAction, LOCATION_CHANGE } from 'connected-react-router'
+import { Entity } from '@dcl/schemas'
+import { AuthIdentity } from '@dcl/crypto'
 import { getAddress } from 'decentraland-dapps/dist/modules/wallet/selectors'
-import { AuthIdentity } from 'dcl-crypto'
-import { CatalystClient } from 'dcl-catalyst-client'
-import { Entity } from 'dcl-catalyst-commons'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { ContentClient } from 'dcl-catalyst-client/dist/client/ContentClient'
+import { isErrorWithMessage } from '../../lib/error'
 import { getIdentity } from '../identity/utils'
 import {
   fetchStoreFailure,
@@ -23,7 +25,7 @@ import {
 } from './utils'
 import { getIsLocalStoreDirty } from './selectors'
 
-export function* storeSaga(client: CatalystClient) {
+export function* storeSaga(client: ContentClient) {
   yield takeEvery(FETCH_STORE_REQUEST, handleFetchStoreRequest)
   yield takeEvery(UPDATE_STORE_REQUEST, handleUpdateStoreRequest)
   yield takeEvery(LOCATION_CHANGE, handleLocationChange)
@@ -58,8 +60,12 @@ export function* storeSaga(client: CatalystClient) {
           storeEntity ? getStoreFromEntity(storeEntity) : undefined
         )
       )
-    } catch (e) {
-      yield put(fetchStoreFailure(e.message))
+    } catch (error) {
+      yield put(
+        fetchStoreFailure(
+          isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+        )
+      )
     }
   }
 
@@ -72,8 +78,12 @@ export function* storeSaga(client: CatalystClient) {
       yield call(deployStoreEntity, client, identity, store)
 
       yield put(updateStoreSuccess(store))
-    } catch (e) {
-      yield put(updateStoreFailure(e.message))
+    } catch (error) {
+      yield put(
+        updateStoreFailure(
+          isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+        )
+      )
     }
   }
 }

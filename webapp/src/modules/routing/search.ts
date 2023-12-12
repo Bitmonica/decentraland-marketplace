@@ -1,5 +1,7 @@
 import {
-  CollectionSortBy,
+  CatalogSortBy,
+  EmoteCategory,
+  EmotePlayMode,
   ItemSortBy,
   Network,
   NFTCategory,
@@ -9,15 +11,52 @@ import { View } from '../ui/types'
 import { BrowseOptions, SortBy, SortDirection } from './types'
 import { Section } from '../vendor/decentraland'
 import { NFTSortBy } from '../nft/types'
-import { isAccountView } from '../ui/utils'
+import { isAccountView, isLandSection } from '../ui/utils'
+import { AssetStatusFilter } from '../../utils/filters'
+import { AssetType } from '../asset/types'
+import { isCatalogView, isCatalogViewWithStatusFilter } from './utils'
 
 const SEARCH_ARRAY_PARAM_SEPARATOR = '_'
 
-export function getDefaultOptionsByView(view?: View): BrowseOptions {
-  return {
-    onlyOnSale: !view || !isAccountView(view),
-    sortBy: view && isAccountView(view) ? SortBy.NEWEST : SortBy.RECENTLY_LISTED
+export function getDefaultOptionsByView(
+  view?: View,
+  section?: Section
+): BrowseOptions {
+  if (section === Section.LISTS) return {}
+
+  let defaultOptions: Partial<BrowseOptions> = {
+    onlyOnSale: view && isAccountView(view) ? false : undefined,
+    sortBy:
+      view && isAccountView(view)
+        ? SortBy.NEWEST
+        : section && isLandSection(section)
+        ? SortBy.NEWEST
+        : SortBy.RECENTLY_LISTED
   }
+  if (section && isCatalogView(view)) {
+    const currentCategoryBySection = getCategoryFromSection(section)
+    if (
+      currentCategoryBySection &&
+      [NFTCategory.EMOTE, NFTCategory.WEARABLE].includes(
+        currentCategoryBySection
+      )
+    ) {
+      defaultOptions = {
+        ...defaultOptions,
+        onlyOnSale: view === View.CURRENT_ACCOUNT ? false : undefined, // current account shows on sale false as default
+        status: isCatalogViewWithStatusFilter(view) // for market view, we show status on sale filter as default
+          ? AssetStatusFilter.ON_SALE
+          : undefined
+      }
+    } else if (currentCategoryBySection === NFTCategory.ENS) {
+      defaultOptions = {
+        ...defaultOptions,
+        status: undefined, // status doesn't apply to ENS
+        onlyOnSale: true // show ENS names on sale by default
+      }
+    }
+  }
+  return defaultOptions
 }
 
 export function getSearchParams(options?: BrowseOptions) {
@@ -53,11 +92,17 @@ export function getSearchParams(options?: BrowseOptions) {
     if (options.onlyOnSale !== undefined) {
       params.set('onlyOnSale', options.onlyOnSale.toString())
     }
+    if (options.onlyOnRent !== undefined) {
+      params.set('onlyOnRent', options.onlyOnRent.toString())
+    }
     if (options.rarities && options.rarities.length > 0) {
       params.set(
         'rarities',
         options.rarities.join(SEARCH_ARRAY_PARAM_SEPARATOR)
       )
+    }
+    if (options.status) {
+      params.set('status', options.status.toString())
     }
     if (options.wearableGenders && options.wearableGenders.length > 0) {
       params.set(
@@ -73,6 +118,12 @@ export function getSearchParams(options?: BrowseOptions) {
       )
     }
 
+    if (options.creators && options.creators.length > 0) {
+      for (const creators of options.creators) {
+        params.append('creators', creators)
+      }
+    }
+
     if (options.search) {
       params.set('search', options.search)
     }
@@ -81,12 +132,65 @@ export function getSearchParams(options?: BrowseOptions) {
       params.set('network', options.network)
     }
 
+    if (
+      options.emotePlayMode?.length &&
+      options.emotePlayMode?.every(option =>
+        Object.values(EmotePlayMode).includes(option)
+      )
+    ) {
+      for (const emotePlayMode of options.emotePlayMode) {
+        params.append('emotePlayMode', emotePlayMode)
+      }
+    }
+
     if (options.viewAsGuest !== undefined) {
       params.set('viewAsGuest', options.viewAsGuest.toString())
     }
 
     if (options.onlySmart !== undefined) {
       params.set('onlySmart', options.onlySmart.toString())
+    }
+
+    if (options.minPrice) {
+      params.set('minPrice', options.minPrice)
+    }
+
+    if (options.maxPrice) {
+      params.set('maxPrice', options.maxPrice)
+    }
+
+    if (options.minEstateSize) {
+      params.set('minEstateSize', options.minEstateSize)
+    }
+
+    if (options.maxEstateSize) {
+      params.set('maxEstateSize', options.maxEstateSize)
+    }
+
+    if (options.minDistanceToPlaza) {
+      params.set('minDistanceToPlaza', options.minDistanceToPlaza)
+    }
+
+    if (options.adjacentToRoad) {
+      params.set('adjacentToRoad', options.adjacentToRoad.toString())
+    }
+
+    if (options.maxDistanceToPlaza) {
+      params.set('maxDistanceToPlaza', options.maxDistanceToPlaza)
+    }
+
+    if (options.rentalDays) {
+      for (const rentalDay of options.rentalDays) {
+        params.append('rentalDays', rentalDay.toString())
+      }
+    }
+
+    if (options.emoteHasSound) {
+      params.set('emoteHasSound', 'true')
+    }
+
+    if (options.emoteHasGeometry) {
+      params.set('emoteHasGeometry', 'true')
     }
   }
   return params
@@ -101,6 +205,14 @@ export function getCategoryFromSection(section: string) {
     case Section.ENS:
       return NFTCategory.ENS
     case Section.EMOTES:
+    case Section.EMOTES_DANCE:
+    case Section.EMOTES_FUN:
+    case Section.EMOTES_GREETINGS:
+    case Section.EMOTES_HORROR:
+    case Section.EMOTES_MISCELLANEOUS:
+    case Section.EMOTES_POSES:
+    case Section.EMOTES_REACTIONS:
+    case Section.EMOTES_STUNT:
       return NFTCategory.EMOTE
     case Section.WEARABLES:
     case Section.WEARABLES_HEAD:
@@ -121,6 +233,7 @@ export function getCategoryFromSection(section: string) {
     case Section.WEARABLES_TIARA:
     case Section.WEARABLES_TOP_HEAD:
     case Section.WEARABLES_SKIN:
+    case Section.WEARABLES_HANDS:
       return NFTCategory.WEARABLE
   }
 }
@@ -140,9 +253,28 @@ export function getSectionFromCategory(category: NFTCategory) {
   }
 }
 
-export function getSearchWearableSection(category: WearableCategory) {
+export function getMarketAssetTypeFromCategory(category: NFTCategory) {
+  switch (category) {
+    case NFTCategory.PARCEL:
+      return AssetType.NFT
+    case NFTCategory.ESTATE:
+      return AssetType.NFT
+    case NFTCategory.ENS:
+      return AssetType.NFT
+    case NFTCategory.EMOTE:
+      return AssetType.ITEM
+    case NFTCategory.WEARABLE:
+      return AssetType.ITEM
+  }
+}
+
+export function getSearchSection(category: WearableCategory | EmoteCategory) {
   for (const section of Object.values(Section)) {
-    const sectionCategory = getSearchWearableCategory(section)
+    const sectionCategory = Object.values(EmoteCategory).includes(
+      category as EmoteCategory
+    )
+      ? getSearchEmoteCategory(section)
+      : getSearchWearableCategory(section)
     if (category === sectionCategory) {
       return section
     }
@@ -183,6 +315,29 @@ export function getSearchWearableCategory(section: string) {
       return WearableCategory.TOP_HEAD
     case Section.WEARABLES_SKIN:
       return WearableCategory.SKIN
+    case Section.WEARABLES_HANDS:
+      return WearableCategory.HANDS_WEAR
+  }
+}
+
+export function getSearchEmoteCategory(section: string) {
+  switch (section) {
+    case Section.EMOTES_DANCE:
+      return EmoteCategory.DANCE
+    case Section.EMOTES_FUN:
+      return EmoteCategory.FUN
+    case Section.EMOTES_GREETINGS:
+      return EmoteCategory.GREETINGS
+    case Section.EMOTES_HORROR:
+      return EmoteCategory.HORROR
+    case Section.EMOTES_MISCELLANEOUS:
+      return EmoteCategory.MISCELLANEOUS
+    case Section.EMOTES_POSES:
+      return EmoteCategory.POSES
+    case Section.EMOTES_REACTIONS:
+      return EmoteCategory.REACTIONS
+    case Section.EMOTES_STUNT:
+      return EmoteCategory.STUNT
   }
 }
 
@@ -195,7 +350,7 @@ export function getItemSortBy(sortBy: SortBy): ItemSortBy {
     case SortBy.NEWEST:
       return ItemSortBy.NEWEST
     case SortBy.RECENTLY_LISTED:
-      return ItemSortBy.RECENTLY_REVIEWED
+      return ItemSortBy.RECENTLY_LISTED
     case SortBy.RECENTLY_SOLD:
       return ItemSortBy.RECENTLY_SOLD
     default:
@@ -203,18 +358,20 @@ export function getItemSortBy(sortBy: SortBy): ItemSortBy {
   }
 }
 
-export function getCollectionSortBy(sortBy: SortBy): CollectionSortBy {
+export function getCatalogSortBy(sortBy: SortBy): CatalogSortBy {
   switch (sortBy) {
-    case SortBy.NAME:
-      return CollectionSortBy.NAME
+    case SortBy.CHEAPEST:
+      return CatalogSortBy.CHEAPEST
+    case SortBy.MOST_EXPENSIVE:
+      return CatalogSortBy.MOST_EXPENSIVE
     case SortBy.NEWEST:
-      return CollectionSortBy.NEWEST
-    case SortBy.RECENTLY_REVIEWED:
-      return CollectionSortBy.RECENTLY_REVIEWED
-    case SortBy.SIZE:
-      return CollectionSortBy.SIZE
+      return CatalogSortBy.NEWEST
+    case SortBy.RECENTLY_LISTED:
+      return CatalogSortBy.RECENTLY_LISTED
+    case SortBy.RECENTLY_SOLD:
+      return CatalogSortBy.RECENTLY_SOLD
     default:
-      return CollectionSortBy.NEWEST
+      return CatalogSortBy.CHEAPEST
   }
 }
 
@@ -243,6 +400,26 @@ export function getAssetOrderBy(sortBy: SortBy) {
       orderDirection = SortDirection.ASC
       break
     }
+    case SortBy.MAX_RENTAL_PRICE: {
+      orderBy = NFTSortBy.MAX_RENTAL_PRICE
+      orderDirection = SortDirection.ASC
+      break
+    }
+    case SortBy.MIN_RENTAL_PRICE: {
+      orderBy = NFTSortBy.MIN_RENTAL_PRICE
+      orderDirection = SortDirection.ASC
+      break
+    }
+    case SortBy.RENTAL_DATE: {
+      orderBy = NFTSortBy.RENTAL_DATE
+      orderDirection = SortDirection.DESC
+      break
+    }
+    case SortBy.RENTAL_LISTING_DATE: {
+      orderBy = NFTSortBy.RENTAL_LISTING_DATE
+      orderDirection = SortDirection.DESC
+      break
+    }
   }
 
   return [orderBy, orderDirection] as const
@@ -268,12 +445,34 @@ export function getNFTSortBy(orderBy: NFTSortBy) {
       sortBy = SortBy.CHEAPEST
       break
     }
+    case NFTSortBy.MAX_RENTAL_PRICE: {
+      sortBy = SortBy.MAX_RENTAL_PRICE
+    }
   }
 
   return sortBy
 }
 
 export function getURLParamArray<T extends string>(
+  search: string,
+  paramName: string,
+  validValues: string[] = []
+) {
+  let params = new URLSearchParams(search).getAll(paramName) as T[]
+
+  if (validValues.length > 0) {
+    params = params.filter(item => validValues.includes(item))
+  }
+
+  return params
+}
+
+// TODO: This is currently using a non standard way of parsing query params
+// This might be because of an old functionality but for example, rarities
+// from the URL are parsed from rarities=common_uncommon instead of
+// rarities=common&rarities=uncommon I'll leave it as it is for now to prevent
+// further refactoring but should be changed in the future.
+export function getURLParamArray_nonStandard<T extends string>(
   search: string,
   paramName: string,
   validValues: string[] = []

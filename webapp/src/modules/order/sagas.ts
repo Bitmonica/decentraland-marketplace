@@ -1,4 +1,30 @@
-import { put, call, takeEvery, select } from 'redux-saga/effects'
+import { put, call, takeEvery, select, race, take } from 'redux-saga/effects'
+import { ListingStatus, RentalListing, RentalStatus } from '@dcl/schemas'
+import {
+  CONNECT_WALLET_SUCCESS,
+  ConnectWalletSuccessAction
+} from 'decentraland-dapps/dist/modules/wallet/actions'
+import { ErrorCode } from 'decentraland-transactions'
+import { t } from 'decentraland-dapps/dist/modules/translation/utils'
+import { waitForTx } from 'decentraland-dapps/dist/modules/transaction/utils'
+import {
+  SetPurchaseAction,
+  SET_PURCHASE
+} from 'decentraland-dapps/dist/modules/gateway/actions'
+import { isNFTPurchase } from 'decentraland-dapps/dist/modules/gateway/utils'
+import { PurchaseStatus } from 'decentraland-dapps/dist/modules/gateway/types'
+import { isErrorWithMessage } from '../../lib/error'
+import { getWallet } from '../wallet/selectors'
+import { Vendor, VendorFactory } from '../vendor/VendorFactory'
+import { getRentalById } from '../rental/selectors'
+import {
+  isRentalListingOpen,
+  waitUntilRentalChangesStatus
+} from '../rental/utils'
+import { buyAssetWithCard } from '../asset/utils'
+import { VendorName } from '../vendor'
+import { getData as getNFTs } from '../nft/selectors'
+import { getNFT } from '../nft/utils'
 import {
   CREATE_ORDER_REQUEST,
   CreateOrderRequestAction,
@@ -11,15 +37,75 @@ import {
   CANCEL_ORDER_REQUEST,
   CancelOrderRequestAction,
   cancelOrderSuccess,
-  cancelOrderFailure
+  cancelOrderFailure,
+  executeOrderTransactionSubmitted,
+  ExecuteOrderWithCardRequestAction,
+  EXECUTE_ORDER_WITH_CARD_REQUEST,
+  executeOrderWithCardFailure,
+  executeOrderWithCardSuccess,
+  FETCH_LEGACY_ORDERS_REQUEST,
+  FetchLegacyOrdersRequestAction,
+  fetchOrdersSuccess,
+  fetchOrdersRequest,
+  fetchOrdersFailure
 } from './actions'
-import { getWallet } from '../wallet/selectors'
-import { VendorFactory } from '../vendor/VendorFactory'
+import {
+  FetchNFTFailureAction,
+  fetchNFTRequest,
+  FetchNFTSuccessAction,
+  FETCH_NFT_FAILURE,
+  FETCH_NFT_SUCCESS
+} from '../nft/actions'
+import SubgraphService from '../vendor/decentraland/SubgraphService'
+import { getSubgraphOrdersQuery } from './utils'
+import { LegacyOrderFragment } from './types'
 
 export function* orderSaga() {
   yield takeEvery(CREATE_ORDER_REQUEST, handleCreateOrderRequest)
   yield takeEvery(EXECUTE_ORDER_REQUEST, handleExecuteOrderRequest)
+  yield takeEvery(
+    EXECUTE_ORDER_WITH_CARD_REQUEST,
+    handleExecuteOrderWithCardRequest
+  )
+  yield takeEvery(SET_PURCHASE, handleSetNftPurchaseWithCard)
   yield takeEvery(CANCEL_ORDER_REQUEST, handleCancelOrderRequest)
+  yield takeEvery(FETCH_LEGACY_ORDERS_REQUEST, handleFetchLegacyOrdersRequest)
+  yield takeEvery(CONNECT_WALLET_SUCCESS, handleConnectWalletSuccess)
+}
+
+function* handleConnectWalletSuccess(action: ConnectWalletSuccessAction) {
+  const { address } = action.payload.wallet
+  yield put(fetchOrdersRequest(address, { status: ListingStatus.OPEN }))
+}
+
+function* handleFetchLegacyOrdersRequest(
+  action: FetchLegacyOrdersRequestAction
+) {
+  const { address, filters } = action.payload
+
+  try {
+    const query = getSubgraphOrdersQuery({ ...filters, owner: address })
+
+    const response: { data: { orders: LegacyOrderFragment[] } } = yield call(
+      [SubgraphService, 'fetch'],
+      'marketplace-legacy', // @TODO: put this nicer
+      query
+    )
+    yield put(fetchOrdersSuccess(response.data.orders))
+  } catch (error) {
+    const errorMessage = isErrorWithMessage(error)
+      ? error.message
+      : t('global.unknown_error')
+    const errorCode =
+      error !== undefined &&
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error
+        ? (error as { code: ErrorCode }).code
+        : undefined
+
+    yield put(fetchOrdersFailure(address, errorMessage, errorCode))
+  }
 }
 
 function* handleCreateOrderRequest(action: CreateOrderRequestAction) {
@@ -33,31 +119,142 @@ function* handleCreateOrderRequest(action: CreateOrderRequestAction) {
     )
     yield put(createOrderSuccess(nft, price, expiresAt, txHash))
   } catch (error) {
+    const errorMessage = isErrorWithMessage(error)
+      ? error.message
+      : t('global.unknown_error')
+    const errorCode =
+      error !== undefined &&
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error
+        ? (error as { code: ErrorCode }).code
+        : undefined
+
     yield put(
-      createOrderFailure(nft, price, expiresAt, error.message, error.code)
+      createOrderFailure(nft, price, expiresAt, errorMessage, errorCode)
     )
   }
 }
 
 function* handleExecuteOrderRequest(action: ExecuteOrderRequestAction) {
-  const { order, nft, fingerprint } = action.payload
+  const { order, nft, fingerprint, silent } = action.payload
+
   try {
     if (
-      nft.contractAddress !== order.contractAddress &&
+      nft.contractAddress !== order.contractAddress ||
       nft.tokenId !== order.tokenId
     ) {
       throw new Error('The order does not match the NFT')
     }
-    const { orderService } = VendorFactory.build(nft.vendor)
-
-    const wallet: ReturnType<typeof getWallet> = yield select(getWallet)
-    const txHash: string = yield call(() =>
-      orderService.execute(wallet, nft, order, fingerprint)
+    const { orderService }: Vendor<VendorName> = yield call(
+      [VendorFactory, 'build'],
+      nft.vendor
     )
 
-    yield put(executeOrderSuccess(order, nft, txHash))
+    const wallet: ReturnType<typeof getWallet> = yield select(getWallet)
+    const txHash: string = yield call(
+      [orderService, 'execute'],
+      wallet,
+      nft,
+      order,
+      fingerprint
+    )
+
+    yield put(executeOrderTransactionSubmitted(order, nft, txHash))
+    if (nft.openRentalId) {
+      yield call(waitForTx, txHash)
+      const rental: RentalListing = yield select(
+        getRentalById,
+        nft.openRentalId
+      )
+      if (isRentalListingOpen(rental)) {
+        yield call(waitUntilRentalChangesStatus, nft, RentalStatus.CANCELLED)
+      }
+    }
+
+    yield put(executeOrderSuccess(txHash, nft))
   } catch (error) {
-    yield put(executeOrderFailure(order, nft, error.message, error.code))
+    const errorMessage = isErrorWithMessage(error)
+      ? error.message
+      : t('global.unknown_error')
+    const errorCode =
+      error !== undefined &&
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error
+        ? (error as { code: ErrorCode }).code
+        : undefined
+
+    yield put(executeOrderFailure(order, nft, errorMessage, errorCode, silent))
+  }
+}
+
+function* handleExecuteOrderWithCardRequest(
+  action: ExecuteOrderWithCardRequestAction
+) {
+  const { nft } = action.payload
+
+  try {
+    yield call(buyAssetWithCard, nft)
+  } catch (error) {
+    yield put(
+      executeOrderWithCardFailure(
+        isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+      )
+    )
+  }
+}
+
+function* handleSetNftPurchaseWithCard(action: SetPurchaseAction) {
+  try {
+    const { purchase } = action.payload
+    const { status, txHash } = purchase
+
+    if (
+      isNFTPurchase(purchase) &&
+      purchase.nft.tokenId &&
+      status === PurchaseStatus.COMPLETE &&
+      txHash
+    ) {
+      const {
+        nft: { contractAddress, tokenId }
+      } = purchase
+
+      const nfts: ReturnType<typeof getNFTs> = yield select(getNFTs)
+      let nft: ReturnType<typeof getNFT> = yield call(
+        getNFT,
+        contractAddress,
+        tokenId,
+        nfts
+      )
+
+      if (!nft) {
+        yield put(fetchNFTRequest(contractAddress, tokenId))
+
+        const {
+          success,
+          failure
+        }: {
+          success: FetchNFTSuccessAction
+          failure: FetchNFTFailureAction
+        } = yield race({
+          success: take(FETCH_NFT_SUCCESS),
+          failure: take(FETCH_NFT_FAILURE)
+        })
+
+        if (failure) throw new Error(failure.payload.error)
+
+        nft = success.payload.nft
+      }
+
+      yield put(executeOrderWithCardSuccess(purchase, nft, txHash))
+    }
+  } catch (error) {
+    yield put(
+      executeOrderWithCardFailure(
+        isErrorWithMessage(error) ? error.message : t('global.unknown_error')
+      )
+    )
   }
 }
 
@@ -76,6 +273,17 @@ function* handleCancelOrderRequest(action: CancelOrderRequestAction) {
     const txHash: string = yield call(() => orderService.cancel(wallet, order))
     yield put(cancelOrderSuccess(order, nft, txHash))
   } catch (error) {
-    yield put(cancelOrderFailure(order, nft, error.message, error.code))
+    const errorMessage = isErrorWithMessage(error)
+      ? error.message
+      : t('global.unknown_error')
+    const errorCode =
+      error !== undefined &&
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error
+        ? (error as { code: ErrorCode }).code
+        : undefined
+
+    yield put(cancelOrderFailure(order, nft, errorMessage, errorCode))
   }
 }

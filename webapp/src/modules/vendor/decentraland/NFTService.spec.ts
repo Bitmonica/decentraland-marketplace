@@ -1,17 +1,23 @@
-import { Network, ChainId } from '@dcl/schemas'
+import {
+  Network,
+  ChainId,
+  Order,
+  RentalListing,
+  RentalStatus
+} from '@dcl/schemas'
 import * as walletUtils from 'decentraland-dapps/dist/modules/wallet/utils'
 import { Wallet } from 'decentraland-dapps/dist/modules/wallet/types'
 import { NFT, NFTsCountParams, NFTsFetchParams } from '../../nft/types'
 import { VendorName } from '../types'
 import { NFTService } from './NFTService'
-import * as api from './nft/api'
+import * as authApi from './nft/authApi'
 import { NFTResult, NFTsFetchFilters } from './nft'
-import { Order } from '../../order/types'
 import {
   ContractData,
   ContractName,
   getContract
 } from 'decentraland-transactions'
+import { getERC721ContractData } from './utils'
 
 jest.mock('decentraland-dapps/dist/modules/wallet/utils')
 jest.mock('./nft/api')
@@ -25,10 +31,8 @@ describe("Decentraland's NFTService", () => {
   let nft: NFT
   let order: Order
   let wallet: Wallet | null
-  let erc721Contract: {
-    transferFrom: jest.Mock
-  }
   let filters: NFTsFetchFilters
+  let rental: RentalListing
 
   beforeEach(() => {
     nftService = new NFTService()
@@ -39,12 +43,10 @@ describe("Decentraland's NFTService", () => {
       tokenId: 'aTokenId',
       owner: anAddress
     } as NFT
-    erc721Contract = {
-      transferFrom: jest.fn().mockReturnValue('transferFrom')
-    }
     wallet = { address: anAddress } as Wallet
     order = { id: 'anID' } as Order
     filters = { isWearableAccessory: true }
+    rental = { id: 'aRentalId' } as RentalListing
   })
 
   afterEach(() => {
@@ -60,9 +62,12 @@ describe("Decentraland's NFTService", () => {
 
     describe('when the fetch fails', () => {
       beforeEach(() => {
-        ;(api.nftAPI.fetch as jest.Mock).mockRejectedValueOnce(
-          aBasicErrorMessage
-        )
+        // ;(api.nftAPI.fetch as jest.Mock).mockRejectedValueOnce(
+        //   aBasicErrorMessage
+        // )
+        jest
+          .spyOn(authApi.NFTAuthAPI.prototype, 'get')
+          .mockRejectedValueOnce(aBasicErrorMessage)
       })
 
       it("should reject with the fetch's error", () => {
@@ -80,10 +85,10 @@ describe("Decentraland's NFTService", () => {
       beforeEach(() => {
         anotherNFT = { ...nft, owner: 'anotherAddress', id: 'anotherNFTID' }
         nftResults = [
-          { nft, order },
-          { nft: anotherNFT, order: null }
+          { nft, order, rental },
+          { nft: anotherNFT, order: null, rental: null }
         ]
-        ;(api.nftAPI.fetch as jest.Mock).mockResolvedValueOnce({
+        jest.spyOn(authApi.NFTAuthAPI.prototype, 'get').mockResolvedValueOnce({
           data: nftResults,
           total
         })
@@ -91,13 +96,12 @@ describe("Decentraland's NFTService", () => {
 
       it('should have fetched the NFTs with the filter and NFT params', async () => {
         await nftService.fetch(fetchParams, filters)
-        expect(api.nftAPI.fetch as jest.Mock).toHaveBeenCalledWith(
-          fetchParams,
-          filters
-        )
+        expect(
+          authApi.NFTAuthAPI.prototype.get as jest.Mock
+        ).toHaveBeenCalledWith(fetchParams, filters)
       })
 
-      it('should return the NFTs, the accounts, the orders and the total', () => {
+      it('should return the NFTs, the accounts, the orders, the rentals and the total', () => {
         return expect(nftService.fetch(fetchParams, filters)).resolves.toEqual([
           [
             { ...nft, vendor: VendorName.DECENTRALAND },
@@ -112,6 +116,7 @@ describe("Decentraland's NFTService", () => {
             }
           ],
           [order],
+          [rental],
           total
         ])
       })
@@ -127,9 +132,9 @@ describe("Decentraland's NFTService", () => {
 
     describe('when the fetch fails', () => {
       beforeEach(() => {
-        ;(api.nftAPI.fetch as jest.Mock).mockRejectedValueOnce(
-          aBasicErrorMessage
-        )
+        jest
+          .spyOn(authApi.NFTAuthAPI.prototype, 'get')
+          .mockRejectedValueOnce(aBasicErrorMessage)
       })
 
       it("should reject with the fetch's error", () => {
@@ -143,12 +148,16 @@ describe("Decentraland's NFTService", () => {
       const total = 1
 
       beforeEach(() => {
-        ;(api.nftAPI.fetch as jest.Mock).mockResolvedValueOnce({ total })
+        jest
+          .spyOn(authApi.NFTAuthAPI.prototype, 'get')
+          .mockResolvedValueOnce({ total, data: [] })
       })
 
       it('should have fetched the NFTs with the count and filter params, with the first and skip params as 0', async () => {
         await nftService.count(countParams, filters)
-        expect(api.nftAPI.fetch as jest.Mock).toHaveBeenCalledWith(
+        expect(
+          authApi.NFTAuthAPI.prototype.get as jest.Mock
+        ).toHaveBeenCalledWith(
           {
             ...countParams,
             skip: 0,
@@ -169,9 +178,9 @@ describe("Decentraland's NFTService", () => {
   describe('when fetching one NFT', () => {
     describe('when the fetch fails', () => {
       beforeEach(() => {
-        ;(api.nftAPI.fetchOne as jest.Mock).mockRejectedValueOnce(
-          aBasicErrorMessage
-        )
+        jest
+          .spyOn(authApi.NFTAuthAPI.prototype, 'fetchOne')
+          .mockRejectedValueOnce(aBasicErrorMessage)
       })
 
       it("should reject with the fetch's error", () => {
@@ -183,24 +192,34 @@ describe("Decentraland's NFTService", () => {
 
     describe('when the fetch is successful', () => {
       beforeEach(() => {
-        ;(api.nftAPI.fetchOne as jest.Mock).mockResolvedValueOnce({
-          order,
-          nft
-        })
+        jest
+          .spyOn(authApi.NFTAuthAPI.prototype, 'fetchOne')
+          .mockResolvedValueOnce({
+            order,
+            nft,
+            rental
+          })
       })
 
       it('should fetch the NFT with the provided address and the token ID', async () => {
-        await nftService.fetchOne(nft.contractAddress, nft.id)
-        expect(api.nftAPI.fetchOne as jest.Mock).toHaveBeenCalledWith(
-          nft.contractAddress,
-          nft.id
-        )
+        await nftService.fetchOne(nft.contractAddress, nft.id, {
+          rentalStatus: [RentalStatus.EXECUTED]
+        })
+        expect(
+          authApi.NFTAuthAPI.prototype.fetchOne as jest.Mock
+        ).toHaveBeenCalledWith(nft.contractAddress, nft.id, {
+          rentalStatus: [RentalStatus.EXECUTED]
+        })
       })
 
       it('should return the NFT with its vendor and the order', () => {
         return expect(
           nftService.fetchOne(nft.contractAddress, nft.id)
-        ).resolves.toEqual([{ ...nft, vendor: VendorName.DECENTRALAND }, order])
+        ).resolves.toEqual([
+          { ...nft, vendor: VendorName.DECENTRALAND },
+          order,
+          rental
+        ])
       })
     })
   })
@@ -250,21 +269,19 @@ describe("Decentraland's NFTService", () => {
           await nftService.transfer(wallet, anAddress, nft)
           expect(walletUtils.sendTransaction as jest.Mock).toHaveBeenCalledWith(
             contract,
-            expect.any(Function)
+            'transferFrom',
+            wallet?.address,
+            anAddress,
+            nft.tokenId
           )
         })
 
         it("should have called send transaction with the contract's createOrder order operation", async () => {
           await nftService.transfer(wallet, anAddress, nft)
-          expect(walletUtils.sendTransaction as jest.Mock).toHaveBeenCalled()
 
-          const secondParameter = (walletUtils.sendTransaction as jest.Mock)
-            .mock.calls[0][1]
-          const parametrizedContractExecutionResult = secondParameter(
-            erc721Contract
-          )
-          expect(parametrizedContractExecutionResult).toBe('transferFrom')
-          expect(erc721Contract.transferFrom).toHaveBeenCalledWith(
+          expect(walletUtils.sendTransaction).toHaveBeenCalledWith(
+            getERC721ContractData(nft),
+            'transferFrom',
             wallet!.address,
             anAddress,
             nft.tokenId
@@ -314,21 +331,19 @@ describe("Decentraland's NFTService", () => {
           await nftService.transfer(wallet, anAddress, nft)
           expect(walletUtils.sendTransaction as jest.Mock).toHaveBeenCalledWith(
             contract,
-            expect.any(Function)
+            'transferFrom',
+            wallet?.address,
+            anAddress,
+            nft.tokenId
           )
         })
 
         it("should have called send transaction with the contract's createOrder order operation", async () => {
           await nftService.transfer(wallet, anAddress, nft)
-          expect(walletUtils.sendTransaction as jest.Mock).toHaveBeenCalled()
 
-          const secondParameter = (walletUtils.sendTransaction as jest.Mock)
-            .mock.calls[0][1]
-          const parametrizedContractExecutionResult = secondParameter(
-            erc721Contract
-          )
-          expect(parametrizedContractExecutionResult).toBe('transferFrom')
-          expect(erc721Contract.transferFrom).toHaveBeenCalledWith(
+          expect(walletUtils.sendTransaction).toHaveBeenCalledWith(
+            getERC721ContractData(nft),
+            'transferFrom',
             wallet!.address,
             anAddress,
             nft.tokenId

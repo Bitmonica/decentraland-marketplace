@@ -1,31 +1,12 @@
 import {
   Item,
   ItemSortBy,
-  Network,
-  NFTCategory,
-  Rarity,
-  WearableCategory
+  CatalogSortBy,
+  ItemFilters as ItemFiltersSchema
 } from '@dcl/schemas'
-import { WearableGender } from '../../../nft/wearable/types'
 
-export type ItemFilters = {
-  first?: number
-  skip?: number
-  sortBy?: ItemSortBy
-  creator?: string
-  category?: NFTCategory
-  isSoldOut?: boolean
-  isOnSale?: boolean
-  search?: string
-  isWearableHead?: boolean
-  isWearableAccessory?: boolean
-  isWearableSmart?: boolean
-  wearableCategory?: WearableCategory
-  rarities?: Rarity[]
-  wearableGenders?: WearableGender[]
-  contractAddress?: string
-  itemId?: string
-  network?: Network
+export type ItemFilters = Omit<ItemFiltersSchema, 'sortBy'> & {
+  sortBy?: ItemSortBy | CatalogSortBy
 }
 
 export type ItemResponse = {

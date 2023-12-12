@@ -11,11 +11,12 @@ import './SellPage.css'
 
 const SellPage = (props: Props) => {
   const {
-    authorizations,
     isLoading,
     isCreatingOrder,
-    onNavigate,
-    onCreateOrder
+    onGoBack,
+    getContract,
+    onCreateOrder,
+    onClearOrderErrors
   } = props
   return (
     <>
@@ -29,11 +30,12 @@ const SellPage = (props: Props) => {
                   nft={nft}
                   order={order}
                   wallet={wallet}
-                  authorizations={authorizations}
                   isLoading={isLoading}
                   isCreatingOrder={isCreatingOrder}
-                  onNavigate={onNavigate}
+                  onGoBack={onGoBack}
                   onCreateOrder={onCreateOrder}
+                  getContract={getContract}
+                  onClearOrderErrors={onClearOrderErrors}
                 />
               )}
             </AssetProviderPage>

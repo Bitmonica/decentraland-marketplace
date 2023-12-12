@@ -4,25 +4,56 @@ import { t, T } from 'decentraland-dapps/dist/modules/translation/utils'
 import { ChainCheck, TransactionLink } from 'decentraland-dapps/dist/containers'
 import { getChainConfiguration } from 'decentraland-dapps/dist/lib/chainConfiguration'
 import { Form, Radio, Loader, Popup, RadioProps } from 'decentraland-ui'
+import { getNetwork } from '@dcl/schemas/dist/dapps/chain-id'
+import { Network } from '@dcl/schemas'
+import { AuthorizationType } from 'decentraland-dapps/dist/modules/authorization/types'
+import { isAuthorized } from '../../../lib/authorization'
+
 import { locations } from '../../../modules/routing/locations'
-import { getContract } from '../../../modules/contract/utils'
-import { isAuthorized } from './utils'
 import { Props } from './Authorization.types'
 import './Authorization.css'
 
 const Authorization = (props: Props) => {
-  const { authorization, authorizations, isLoading, onGrant, onRevoke } = props
+  const {
+    authorization,
+    authorizations,
+    shouldUpdateSpendingCap,
+    isLoading,
+    onGrant,
+    onRevoke,
+    getContract
+  } = props
 
   const handleOnChange = useCallback(
-    (isChecked: boolean) =>
-      isChecked ? onGrant(authorization) : onRevoke(authorization),
-    [authorization, onGrant, onRevoke]
+    (isChecked: boolean) => {
+      if (isChecked) {
+        if (
+          getNetwork(authorization.chainId) === Network.ETHEREUM &&
+          authorization.type === AuthorizationType.ALLOWANCE &&
+          isAuthorized(authorization, authorizations) &&
+          shouldUpdateSpendingCap
+        ) {
+          // The MANA contract in ethereum does not allow approving a new allowance unless it is revoked first.
+          // This is a workaround so it can be done via the UI, however it is not ideal as it requires two transactions.
+          onRevoke(authorization)
+        } else {
+          onGrant(authorization)
+        }
+      } else {
+        onRevoke(authorization)
+      }
+    },
+    [authorization, onGrant, onRevoke, shouldUpdateSpendingCap, authorizations]
   )
 
   const { contractAddress, authorizedAddress } = authorization
 
   const contract = getContract({ address: authorizedAddress })
   const token = getContract({ address: contractAddress })
+
+  if (!contract || !token) {
+    return null
+  }
 
   const { network } = getChainConfiguration(token.chainId)
 
@@ -44,7 +75,10 @@ const Authorization = (props: Props) => {
         <ChainCheck chainId={authorization.chainId}>
           {isEnabled => (
             <Radio
-              checked={isAuthorized(authorization, authorizations)}
+              checked={
+                isAuthorized(authorization, authorizations) &&
+                !shouldUpdateSpendingCap
+              }
               label={token.name}
               disabled={!isEnabled}
               onClick={(_, props: RadioProps) =>

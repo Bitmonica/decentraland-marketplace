@@ -1,16 +1,18 @@
-import React, { useState } from 'react'
-import { fromWei } from 'web3x/utils'
-import { addDays } from 'date-fns'
-import dateFnsFormat from 'date-fns/format'
-import { Network, NFTCategory } from '@dcl/schemas'
+import React, { useEffect, useState } from 'react'
+import { ethers } from 'ethers'
+import addDays from 'date-fns/addDays'
+import formatDate from 'date-fns/format'
+import isValid from 'date-fns/isValid'
+import { getNetworkProvider } from 'decentraland-dapps/dist/lib/eth'
+import { Contract, Network, NFTCategory } from '@dcl/schemas'
 import { toFixedMANAValue } from 'decentraland-dapps/dist/lib/mana'
-import {
-  Authorization,
-  AuthorizationType
-} from 'decentraland-dapps/dist/modules/authorization/types'
-import { hasAuthorization } from 'decentraland-dapps/dist/modules/authorization/utils'
+import { AuthorizationType } from 'decentraland-dapps/dist/modules/authorization/types'
+import { AuthorizedAction } from 'decentraland-dapps/dist/containers/withAuthorizedAction/AuthorizationModal'
 import { t, T } from 'decentraland-dapps/dist/modules/translation/utils'
-import { ChainButton } from 'decentraland-dapps/dist/containers'
+import {
+  ChainButton,
+  withAuthorizedAction
+} from 'decentraland-dapps/dist/containers'
 import { Header, Form, Field, Button } from 'decentraland-ui'
 import { ContractName } from 'decentraland-transactions'
 import { parseMANANumber } from '../../../lib/mana'
@@ -18,15 +20,16 @@ import {
   INPUT_FORMAT,
   getDefaultExpirationDate
 } from '../../../modules/order/utils'
-import { locations } from '../../../modules/routing/locations'
 import { VendorFactory } from '../../../modules/vendor/VendorFactory'
 import { getAssetName, isOwnedBy } from '../../../modules/asset/utils'
-import { AuthorizationModal } from '../../AuthorizationModal'
+import { getContractNames } from '../../../modules/vendor'
+import { isStubMaticCollectionContract } from '../../../modules/contract/utils'
+import { getSellItemStatus, getError } from '../../../modules/order/selectors'
+import ERC721ABI from '../../../contracts/ERC721.json'
+import { Contract as DCLContract } from '../../../modules/vendor/services'
 import { AssetAction } from '../../AssetAction'
 import { Mana } from '../../Mana'
 import { ManaField } from '../../ManaField'
-import { getContractNames } from '../../../modules/vendor'
-import { getContract } from '../../../modules/contract/utils'
 import { ConfirmInputValueModal } from '../../ConfirmInputValueModal'
 import { Props } from './SellModal.types'
 import { showPriceBelowMarketValueWarning } from './utils'
@@ -36,25 +39,67 @@ const SellModal = (props: Props) => {
     nft,
     order,
     wallet,
-    authorizations,
     isLoading,
     isCreatingOrder,
-    onNavigate,
-    onCreateOrder
+    getContract,
+    onGoBack,
+    onCreateOrder,
+    onAuthorizedAction,
+    onClearOrderErrors
   } = props
 
   const isUpdate = order !== null
   const [price, setPrice] = useState<string>(
-    isUpdate ? fromWei(order!.price, 'ether') : ''
+    isUpdate ? ethers.utils.formatEther(order!.price) : ''
   )
-  const [expiresAt, setExpiresAt] = useState(
-    isUpdate && order!.expiresAt
-      ? dateFnsFormat(addDays(new Date(+order!.expiresAt), 1), INPUT_FORMAT)
-      : getDefaultExpirationDate()
-  )
-  const [showConfirm, setShowConfirm] = useState(false)
 
-  const [showAuthorizationModal, setShowAuthorizationModal] = useState(false)
+  const [expiresAt, setExpiresAt] = useState(() => {
+    let exp = order?.expiresAt
+
+    if (isUpdate && exp) {
+      // If the order's expiration is in seconds, convert it to milliseconds
+      if (exp.toString().length === 10) {
+        exp = exp * 1000
+      }
+
+      if (isValid(exp)) {
+        return formatDate(addDays(exp, 1), INPUT_FORMAT)
+      }
+    }
+
+    return getDefaultExpirationDate()
+  })
+
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [targetContractLabel, setTargetContractLabel] = useState<string>()
+
+  const nftContract = getContract({
+    address: nft?.contractAddress,
+    network: nft.network
+  }) as DCLContract
+
+  useEffect(() => {
+    if (nftContract.address && isStubMaticCollectionContract(nftContract)) {
+      const fetchContractName = async () => {
+        try {
+          const provider = await getNetworkProvider(nftContract.chainId)
+
+          const erc721 = new ethers.Contract(
+            nftContract.address,
+            ERC721ABI,
+            new ethers.providers.Web3Provider(provider)
+          )
+
+          const name = await erc721.name()
+          setTargetContractLabel(name)
+        } catch (e) {
+          console.warn('Could not fetch contract name')
+        }
+      }
+
+      fetchContractName()
+    }
+  }, [nftContract])
 
   if (!wallet) {
     return null
@@ -67,36 +112,42 @@ const SellModal = (props: Props) => {
     network: nft.network
   })
 
-  const authorization: Authorization = {
-    address: wallet.address,
-    authorizedAddress: marketplace.address,
-    contractAddress: nft.contractAddress,
-    contractName:
-      nft.category === NFTCategory.WEARABLE && nft.network === Network.MATIC
-        ? ContractName.ERC721CollectionV2
-        : ContractName.ERC721,
-    chainId: nft.chainId,
-    type: AuthorizationType.APPROVAL
+  if (!marketplace) {
+    return null
   }
 
   const handleCreateOrder = () =>
-    onCreateOrder(nft, parseMANANumber(price), new Date(expiresAt).getTime())
+    onCreateOrder(
+      nft,
+      parseMANANumber(price),
+      new Date(`${expiresAt} 00:00:00`).getTime()
+    )
 
   const handleSubmit = () => {
-    if (hasAuthorization(authorizations, authorization)) {
-      handleCreateOrder()
-    } else {
-      setShowAuthorizationModal(true)
-      setShowConfirm(false)
-    }
+    onClearOrderErrors()
+    onAuthorizedAction({
+      authorizationType: AuthorizationType.APPROVAL,
+      authorizedAddress: marketplace.address,
+      authorizedContractLabel: marketplace?.label || marketplace.name,
+      targetContract: nftContract as Contract,
+      targetContractName:
+        (nft.category === NFTCategory.WEARABLE ||
+          nft.category === NFTCategory.EMOTE) &&
+        nft.network === Network.MATIC
+          ? ContractName.ERC721CollectionV2
+          : ContractName.ERC721,
+      targetContractLabel:
+        targetContractLabel || nftContract.label || nftContract.name,
+      onAuthorized: handleCreateOrder,
+      tokenId: nft.tokenId
+    })
   }
-
-  const handleClose = () => setShowAuthorizationModal(false)
 
   const { orderService } = VendorFactory.build(nft.vendor)
 
-  const isInvalidDate = new Date(expiresAt).getTime() < Date.now()
-  const isInvalidPrice = parseMANANumber(price) <= 0
+  const isInvalidDate = new Date(`${expiresAt} 00:00:00`).getTime() < Date.now()
+  const isInvalidPrice =
+    parseMANANumber(price) <= 0 || parseFloat(price) !== parseMANANumber(price)
   const isDisabled =
     !orderService.canSell() ||
     !isOwnedBy(nft, wallet) ||
@@ -143,12 +194,7 @@ const SellModal = (props: Props) => {
           />
         </div>
         <div className="buttons">
-          <Button
-            as="div"
-            onClick={() =>
-              onNavigate(locations.nft(nft.contractAddress, nft.tokenId))
-            }
-          >
+          <Button as="div" onClick={onGoBack}>
             {t('global.cancel')}
           </Button>
           <ChainButton
@@ -197,15 +243,21 @@ const SellModal = (props: Props) => {
         loading={isCreatingOrder}
         disabled={isCreatingOrder}
       />
-      <AuthorizationModal
-        open={showAuthorizationModal}
-        authorization={authorization}
-        isLoading={isCreatingOrder}
-        onProceed={handleCreateOrder}
-        onCancel={handleClose}
-      />
     </AssetAction>
   )
 }
 
-export default React.memo(SellModal)
+export default React.memo(
+  withAuthorizedAction(
+    SellModal,
+    AuthorizedAction.SELL,
+    {
+      confirm_transaction: {
+        title: 'sell_page.authorization.confirm_transaction_title'
+      },
+      title: 'sell_page.authorization.title'
+    },
+    getSellItemStatus,
+    getError
+  )
+)

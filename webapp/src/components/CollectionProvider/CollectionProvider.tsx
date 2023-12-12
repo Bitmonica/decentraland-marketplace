@@ -4,25 +4,49 @@ import { Props } from './CollectionProvider.types'
 const CollectionProvider = ({
   collection,
   items,
-  isLoading,
+  isLoadingCollection,
+  isLoadingCollectionItems,
   withItems,
+  contractAddress,
   onFetchCollection,
-  children
+  onFetchCollectionItems,
+  children,
+  error
 }: Props) => {
   useEffect(() => {
-    if (isLoading) {
-      return
+    if (!isLoadingCollection && !collection && !error) {
+      onFetchCollection()
     }
 
     if (
-      !collection ||
-      (withItems && (!items || items.length !== collection.size))
+      !isLoadingCollectionItems &&
+      collection &&
+      withItems &&
+      (!items || items.length !== collection.size)
     ) {
-      onFetchCollection()
+      onFetchCollectionItems(collection)
     }
-  }, [collection, items, withItems, isLoading, onFetchCollection])
+  }, [
+    collection,
+    items,
+    contractAddress,
+    withItems,
+    onFetchCollection,
+    isLoadingCollection,
+    isLoadingCollectionItems,
+    onFetchCollectionItems,
+    error
+  ])
 
-  return <>{children({ collection, items, isLoading })}</>
+  return (
+    <>
+      {children({
+        collection,
+        items,
+        isLoading: isLoadingCollection || isLoadingCollectionItems
+      })}
+    </>
+  )
 }
 
 export default React.memo(CollectionProvider)

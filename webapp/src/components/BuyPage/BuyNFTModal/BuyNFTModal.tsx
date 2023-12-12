@@ -1,120 +1,179 @@
-import React, { useState, useCallback, useMemo } from 'react'
-import { Header, Button } from 'decentraland-ui'
+import React, { useCallback } from 'react'
+import compact from 'lodash/compact'
+import classNames from 'classnames'
 import { Link } from 'react-router-dom'
+import { Contract, NFTCategory } from '@dcl/schemas'
+import { Header, Button, Mana, Icon } from 'decentraland-ui'
 import { T, t } from 'decentraland-dapps/dist/modules/translation/utils'
 import {
-  Authorization,
-  AuthorizationType
-} from 'decentraland-dapps/dist/modules/authorization/types'
-import { hasAuthorization } from 'decentraland-dapps/dist/modules/authorization/utils'
-import { ChainButton } from 'decentraland-dapps/dist/containers'
-import { Network, NFTCategory } from '@dcl/schemas'
+  ChainButton,
+  withAuthorizedAction
+} from 'decentraland-dapps/dist/containers'
+import { getAnalytics } from 'decentraland-dapps/dist/modules/analytics/utils'
 import { ContractName } from 'decentraland-transactions'
+import { AuthorizationType } from 'decentraland-dapps/dist/modules/authorization/types'
+import { AuthorizedAction } from 'decentraland-dapps/dist/containers/withAuthorizedAction/AuthorizationModal'
+import { isWearableOrEmote } from '../../../modules/asset/utils'
 import { locations } from '../../../modules/routing/locations'
-import { isPartner } from '../../../modules/vendor/utils'
 import { useFingerprint } from '../../../modules/nft/hooks'
 import { getContractNames } from '../../../modules/vendor'
-import { getContract } from '../../../modules/contract/utils'
+import * as events from '../../../utils/events'
+import { AssetType } from '../../../modules/asset/types'
+import { Contract as DCLContract } from '../../../modules/vendor/services'
 import { AssetAction } from '../../AssetAction'
-import { AuthorizationModal } from '../../AuthorizationModal'
+import { Network as NetworkSubtitle } from '../../Network'
+import PriceSubtitle from '../../Price'
+import { AssetProviderPage } from '../../AssetProviderPage'
+import { getBuyItemStatus, getError } from '../../../modules/order/selectors'
 import { PriceTooLow } from '../PriceTooLow'
 import { Name } from '../Name'
 import { Price } from '../Price'
+import { CardPaymentsExplanation } from '../CardPaymentsExplanation'
+import { PartiallySupportedNetworkCard } from '../PartiallySupportedNetworkCard'
+import { NotEnoughMana } from '../NotEnoughMana'
+import { PriceHasChanged } from '../PriceHasChanged'
 import { Props } from './BuyNFTModal.types'
 
 const BuyNFTModal = (props: Props) => {
   const {
     nft,
     order,
-    wallet,
-    authorizations,
     isLoading,
     isOwner,
     hasInsufficientMANA,
     hasLowPrice,
-    onExecuteOrder
+    isBuyWithCardPage,
+    isLoadingAuthorization,
+    getContract,
+    onExecuteOrder,
+    onExecuteOrderWithCard,
+    onAuthorizedAction,
+    onClearOrderErrors
   } = props
 
   const [fingerprint, isFingerprintLoading] = useFingerprint(nft)
-  const [showAuthorizationModal, setShowAuthorizationModal] = useState(false)
+  const analytics = getAnalytics()
 
-  const handleExecuteOrder = useCallback(() => {
-    onExecuteOrder(order!, nft, fingerprint)
-  }, [order, nft, fingerprint, onExecuteOrder])
+  const handleExecuteOrder = useCallback(
+    (alreadyAuthorized: boolean = true) => {
+      if (isBuyWithCardPage) {
+        analytics.track(events.CLICK_BUY_NFT_WITH_CARD)
+        return onExecuteOrderWithCard(nft)
+      }
 
-  const authorization: Authorization = useMemo(() => {
-    const contractNames = getContractNames()
+      !!order && onExecuteOrder(order, nft, fingerprint, !alreadyAuthorized)
+    },
+    [
+      isBuyWithCardPage,
+      onExecuteOrderWithCard,
+      onExecuteOrder,
+      order,
+      nft,
+      fingerprint,
+      analytics
+    ]
+  )
 
-    const mana = getContract({
-      name: contractNames.MANA,
-      network: nft.network
-    })
+  const handleCancel = useCallback(() => {
+    if (isBuyWithCardPage) analytics.track(events.CANCEL_BUY_NFT_WITH_CARD)
+  }, [analytics, isBuyWithCardPage])
 
-    return {
-      address: wallet.address,
-      authorizedAddress: isPartner(nft.vendor)
-        ? getContract({
-            name: contractNames.MARKETPLACE_ADAPTER,
-            network: Network.ETHEREUM
-          }).address
-        : order!.marketplaceAddress,
-      contractAddress: mana.address,
-      contractName: ContractName.MANAToken,
-      chainId: nft.chainId,
-      type: AuthorizationType.ALLOWANCE
-    }
-  }, [wallet, nft, order])
+  const contractNames = getContractNames()
+
+  const mana = getContract({
+    name: contractNames.MANA,
+    network: nft.network
+  }) as DCLContract
+
+  const marketplace = getContract({
+    address: order?.marketplaceAddress,
+    network: nft.network
+  }) as DCLContract
 
   const handleSubmit = useCallback(() => {
-    if (hasAuthorization(authorizations, authorization)) {
+    if (isBuyWithCardPage) {
       handleExecuteOrder()
-    } else {
-      setShowAuthorizationModal(true)
+      return
+    }
+    if (!!order) {
+      onClearOrderErrors()
+      onAuthorizedAction({
+        targetContractName: ContractName.MANAToken,
+        authorizationType: AuthorizationType.ALLOWANCE,
+        authorizedAddress: order.marketplaceAddress,
+        targetContract: mana as Contract,
+        authorizedContractLabel: marketplace.label || marketplace.name,
+        requiredAllowanceInWei: order.price,
+        onAuthorized: handleExecuteOrder
+      })
     }
   }, [
-    authorizations,
-    authorization,
     handleExecuteOrder,
-    setShowAuthorizationModal
-  ])
-
-  const handleClose = useCallback(() => setShowAuthorizationModal(false), [
-    setShowAuthorizationModal
+    onAuthorizedAction,
+    onClearOrderErrors,
+    isBuyWithCardPage,
+    order,
+    mana,
+    marketplace
   ])
 
   const isDisabled =
     !order ||
     isOwner ||
-    hasInsufficientMANA ||
+    (hasInsufficientMANA && !isBuyWithCardPage) ||
     (!fingerprint && nft.category === NFTCategory.ESTATE)
 
   const name = <Name asset={nft} />
 
+  const translationPageDescriptorId = compact([
+    'buy',
+    isWearableOrEmote(nft)
+      ? isBuyWithCardPage
+        ? 'with_card'
+        : 'with_mana'
+      : null,
+    'page'
+  ]).join('_')
+
   let subtitle = null
   if (!order) {
-    subtitle = <T id={'buy_page.not_for_sale'} values={{ name }} />
+    subtitle = (
+      <T id={`${translationPageDescriptorId}.not_for_sale`} values={{ name }} />
+    )
   } else if (
     !fingerprint &&
     nft.category === NFTCategory.ESTATE &&
     !isFingerprintLoading
   ) {
-    subtitle = <T id={'buy_page.no_fingerprint'} />
+    subtitle = <T id={`${translationPageDescriptorId}.no_fingerprint`} />
   } else if (isOwner) {
-    subtitle = <T id={'buy_page.is_owner'} values={{ name }} />
-  } else if (hasInsufficientMANA) {
     subtitle = (
+      <T id={`${translationPageDescriptorId}.is_owner`} values={{ name }} />
+    )
+  } else if (hasInsufficientMANA && !isBuyWithCardPage) {
+    const description = (
       <T
-        id={'buy_page.not_enough_mana'}
+        id={`${translationPageDescriptorId}.not_enough_mana`}
         values={{
           name,
           amount: <Price network={nft.network} price={order.price} />
         }}
       />
     )
+    subtitle = isWearableOrEmote(nft) ? (
+      <NotEnoughMana asset={nft} description={description} />
+    ) : (
+      description
+    )
   } else {
-    subtitle = (
+    subtitle = isWearableOrEmote(nft) ? (
+      <div className="subtitle-wrapper">
+        <PriceSubtitle asset={nft} />
+        <NetworkSubtitle asset={nft} />
+      </div>
+    ) : (
       <T
-        id={'buy_page.subtitle'}
+        id={`${translationPageDescriptorId}.subtitle`}
         values={{
           name,
           amount: <Price network={nft.network} price={order.price} />
@@ -126,36 +185,72 @@ const BuyNFTModal = (props: Props) => {
   return (
     <AssetAction asset={nft}>
       <Header size="large">
-        {t('buy_page.title', { category: t(`global.${nft.category}`) })}
+        {t(`${translationPageDescriptorId}.title`, {
+          name,
+          category: t(`global.${nft.category}`)
+        })}
       </Header>
       <div className={isDisabled ? 'error' : ''}>{subtitle}</div>
-      {hasLowPrice ? (
+      <AssetProviderPage type={AssetType.NFT}>
+        {(asset, newOrder) => {
+          return newOrder && order && newOrder.price !== order.price ? (
+            <PriceHasChanged asset={asset} newPrice={newOrder.price} />
+          ) : null
+        }}
+      </AssetProviderPage>
+      {hasLowPrice && !isBuyWithCardPage ? (
         <PriceTooLow chainId={nft.chainId} network={nft.network} />
       ) : null}
-      <div className="buttons">
-        <Button as={Link} to={locations.nft(nft.contractAddress, nft.tokenId)}>
-          {t('global.cancel')}
+      <PartiallySupportedNetworkCard asset={nft} />
+      <div
+        className={classNames('buttons', isWearableOrEmote(nft) && 'with-mana')}
+      >
+        <Button
+          as={Link}
+          to={locations.nft(nft.contractAddress, nft.tokenId)}
+          onClick={handleCancel}
+        >
+          {!isBuyWithCardPage && (hasLowPrice || hasInsufficientMANA)
+            ? t('global.go_back')
+            : t('global.cancel')}
         </Button>
-        {!hasLowPrice ? (
+        {(!hasInsufficientMANA && !hasLowPrice) || isBuyWithCardPage ? (
           <ChainButton
             primary
-            disabled={isDisabled || isLoading}
+            disabled={isDisabled || isLoading || isLoadingAuthorization}
             onClick={handleSubmit}
-            loading={isLoading}
+            loading={isLoading || isLoadingAuthorization}
             chainId={nft.chainId}
           >
-            {t('buy_page.buy')}
+            {isWearableOrEmote(nft) ? (
+              isBuyWithCardPage ? (
+                <Icon name="credit card outline" />
+              ) : (
+                <Mana showTooltip inline size="small" network={nft.network} />
+              )
+            ) : null}
+            {t(`${translationPageDescriptorId}.buy`)}
           </ChainButton>
         ) : null}
       </div>
-      <AuthorizationModal
-        open={showAuthorizationModal}
-        authorization={authorization}
-        onProceed={handleExecuteOrder}
-        onCancel={handleClose}
-      />
+      {isWearableOrEmote(nft) && isBuyWithCardPage ? (
+        <CardPaymentsExplanation
+          translationPageDescriptorId={translationPageDescriptorId}
+        />
+      ) : null}
     </AssetAction>
   )
 }
 
-export default React.memo(BuyNFTModal)
+export default React.memo(
+  withAuthorizedAction(
+    BuyNFTModal,
+    AuthorizedAction.BUY,
+    {
+      action: 'buy_with_mana_page.authorization.action',
+      title_action: 'buy_with_mana_page.authorization.title_action'
+    },
+    getBuyItemStatus,
+    getError
+  )
+)

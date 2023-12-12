@@ -24,22 +24,50 @@
   overflow: hidden;
 }
 
+.headerContainer {
+  width: 100%;
+}
+
 .title {
   font-weight: 600;
 }
 
 .ellipsis {
-  visibility: hidden;
+  visibility: visible;
   color: var(--summer-red);
   cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-right: 5px;
 }
 
 .row:hover .ellipsis {
   visibility: visible;
 }
 
+.tabs {
+  display: flex;
+  align-items: center;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+}
+
+.tab div {
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+}
+
 @media (max-width: 768px) {
   .columnRight {
     margin-top: 12px;
   }
+}
+
+.backBtnContainer {
+  margin-right: 16px;
 }

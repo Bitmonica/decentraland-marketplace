@@ -1,26 +1,43 @@
 import { Dispatch } from 'redux'
-import { Item } from '@dcl/schemas'
-
-import { NFT } from '../../modules/nft/types'
+import { RouterLocation } from 'connected-react-router'
 import { VendorName } from '../../modules/vendor/types'
-import { browse, BrowseAction } from '../../modules/routing/actions'
-import { AssetType } from '../../modules/asset/types'
+import {
+  browse,
+  BrowseAction,
+  clearFilters,
+  ClearFiltersAction
+} from '../../modules/routing/actions'
+import { Section } from '../../modules/vendor/routing/types'
+import { Asset, AssetType } from '../../modules/asset/types'
 
 export type Props = {
   vendor: VendorName
   assetType: AssetType
-  nfts: NFT[]
-  items: Item[]
+  section?: Section
+  assets: Asset[]
   page: number
   count?: number
   isLoading: boolean
-  onBrowse: typeof browse,
-  urlNext: string
+  isManager?: boolean
+  hasFiltersEnabled?: boolean
+  onBrowse: typeof browse
+  onClearFilters: typeof clearFilters
+  search: string
+  visitedLocations: RouterLocation<unknown>[]
 }
 
 export type MapStateProps = Pick<
   Props,
-  'vendor' | 'nfts' | 'items' | 'page' | 'count' | 'isLoading' | 'assetType' | 'urlNext'
+  | 'vendor'
+  | 'section'
+  | 'assets'
+  | 'page'
+  | 'count'
+  | 'isLoading'
+  | 'assetType'
+  | 'search'
+  | 'hasFiltersEnabled'
+  | 'visitedLocations'
 >
-export type MapDispatchProps = Pick<Props, 'onBrowse'>
-export type MapDispatch = Dispatch<BrowseAction>
+export type MapDispatchProps = Pick<Props, 'onBrowse' | 'onClearFilters'>
+export type MapDispatch = Dispatch<BrowseAction | ClearFiltersAction>

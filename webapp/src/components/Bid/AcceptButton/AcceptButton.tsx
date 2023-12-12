@@ -7,13 +7,17 @@ import {
   isInsufficientMANA,
   checkFingerprint
 } from '../../../modules/bid/utils'
+import { isLandLocked } from '../../../modules/rental/utils'
+import { LandLockedPopup } from '../../LandLockedPopup'
 import { Props } from './AcceptButton.types'
 
 const AcceptButton = (props: Props) => {
-  const { nft, bid, onClick } = props
+  const { nft, bid, onClick, rental, userAddress } = props
 
   const [fingerprint, isLoadingFingerprint] = useFingerprint(nft)
   const [hasInsufficientMANA, setHasInsufficientMANA] = useState(false)
+  const isCurrentlyLocked =
+    rental && nft && isLandLocked(userAddress, rental, nft)
 
   useEffect(() => {
     isInsufficientMANA(bid)
@@ -27,6 +31,7 @@ const AcceptButton = (props: Props) => {
   const isValidSeller = !!nft && nft.owner === bid.seller
 
   const isDisabled =
+    isCurrentlyLocked ||
     !nft ||
     isLoadingFingerprint ||
     hasInsufficientMANA ||
@@ -62,6 +67,12 @@ const AcceptButton = (props: Props) => {
         position="top center"
         trigger={<div className="popup-button">{button}</div>}
       />
+    )
+  } else if (isCurrentlyLocked) {
+    button = (
+      <LandLockedPopup asset={nft} rental={rental} userAddress={userAddress}>
+        {button}
+      </LandLockedPopup>
     )
   }
 

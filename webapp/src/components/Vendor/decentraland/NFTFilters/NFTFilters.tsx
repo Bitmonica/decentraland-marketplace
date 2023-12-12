@@ -11,70 +11,117 @@ import {
   Icon,
   NotMobile
 } from 'decentraland-ui'
-import { Network, NFTCategory, Rarity } from '@dcl/schemas'
+import { NFTCategory } from '@dcl/schemas'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
 
 import { SortBy } from '../../../../modules/routing/types'
-import { WearableGender } from '../../../../modules/nft/wearable/types'
-import { Section } from '../../../../modules/vendor/decentraland/routing/types'
 import { getCategoryFromSection } from '../../../../modules/routing/search'
 import { MAX_QUERY_SIZE } from '../../../../modules/vendor/api'
 import { NFTSidebar } from '../../NFTSidebar'
 import { Chip } from '../../../Chip'
 import { TextFilter } from '../../NFTFilters/TextFilter'
-import { FiltersMenu } from '../../NFTFilters/FiltersMenu'
-import { Props } from './NFTFilters.types'
 import { AssetType } from '../../../../modules/asset/types'
+import {
+  isAccountView,
+  isLandSection,
+  persistIsMapProperty
+} from '../../../../modules/ui/utils'
+import { View } from '../../../../modules/ui/types'
+import { ToggleBox } from '../../../AssetBrowse/ToggleBox'
+import { LANDFilters } from '../types'
+import { browseRentedLAND } from '../utils'
+import { Props } from './NFTFilters.types'
+import './NFTFilters.css'
 
 const NFTFilters = (props: Props) => {
   const {
     section,
+    view,
     search,
     count,
     onlyOnSale,
-    onlySmart,
+    onlyOnRent,
     isMap,
     rarities,
     wearableGenders,
     contracts,
-    network,
     onBrowse,
     assetType,
     hasFiltersEnabled,
     onClearFilters
   } = props
-
   const category = section ? getCategoryFromSection(section) : undefined
 
   const [showFiltersMenu, setShowFiltersMenu] = useState(false)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
 
-  const orderBydropdownOptions = [
-    { value: SortBy.RECENTLY_SOLD, text: t('filters.recently_sold') },
-    { value: SortBy.NEWEST, text: t('filters.newest') },
-    { value: SortBy.NAME, text: t('filters.name') }
+  let orderByDropdownOptions = undefined
+  if (onlyOnRent) {
+    orderByDropdownOptions = [
+      {
+        value: SortBy.RENTAL_LISTING_DATE,
+        text: t('filters.recently_listed_for_rent')
+      },
+      { value: SortBy.NAME, text: t('filters.name') },
+      { value: SortBy.NEWEST, text: t('filters.newest') },
+      { value: SortBy.MAX_RENTAL_PRICE, text: t('filters.cheapest') }
+    ]
+  } else {
+    orderByDropdownOptions = [
+      { value: SortBy.NEWEST, text: t('filters.newest') },
+      { value: SortBy.NAME, text: t('filters.name') }
+    ]
+  }
+
+  const landStatusDropdown = [
+    { value: LANDFilters.ALL_LAND, text: t('nft_land_filters.all_land') },
+    {
+      value: LANDFilters.ONLY_FOR_RENT,
+      text: t('nft_land_filters.only_for_rent')
+    },
+    {
+      value: LANDFilters.ONLY_FOR_SALE,
+      text: t('nft_land_filters.only_for_sale')
+    }
   ]
+
   const typeDropdownOptions = [
     { value: AssetType.ITEM, text: t('filters.item') },
     { value: AssetType.NFT, text: t('filters.nft') }
   ]
 
+  const shouldShowOnSaleFilter =
+    (section && !isLandSection(section!)) || !section
+
   if (onlyOnSale) {
-    orderBydropdownOptions.unshift({
+    orderByDropdownOptions.unshift({
       value: SortBy.RECENTLY_LISTED,
       text: t('filters.recently_listed')
     })
-    orderBydropdownOptions.unshift({
+    orderByDropdownOptions.unshift({
+      value: SortBy.RECENTLY_SOLD,
+      text: t('filters.recently_sold')
+    })
+    orderByDropdownOptions.unshift({
       value: SortBy.CHEAPEST,
       text: t('filters.cheapest')
     })
   }
 
-  const sortBy = orderBydropdownOptions.find(
+  const sortBy = orderByDropdownOptions.find(
     option => option.value === props.sortBy
   )
     ? props.sortBy
-    : orderBydropdownOptions[0].value
+    : orderByDropdownOptions[0].value
+
+  let currentLANDStatus: LANDFilters
+  if (onlyOnRent && !onlyOnSale) {
+    currentLANDStatus = LANDFilters.ONLY_FOR_RENT
+  } else if (onlyOnSale && !onlyOnRent) {
+    currentLANDStatus = LANDFilters.ONLY_FOR_SALE
+  } else {
+    currentLANDStatus = LANDFilters.ALL_LAND
+  }
 
   const appliedFilters = []
   if (rarities.length > 0) {
@@ -87,11 +134,6 @@ const NFTFilters = (props: Props) => {
     appliedFilters.push(t('nft_filters.collection'))
   }
 
-  const handleToggleOnlySmart = useCallback(
-    (newOnlySmart: boolean) => onBrowse({ onlySmart: newOnlySmart }),
-    [onBrowse]
-  )
-
   const handleOnlyOnSaleChange = useCallback(
     (_, props: CheckboxProps) => {
       onBrowse({ sortBy: SortBy.NEWEST, onlyOnSale: !!props.checked })
@@ -101,9 +143,20 @@ const NFTFilters = (props: Props) => {
 
   const handleIsMapChange = useCallback(
     (isMap: boolean) => {
-      onBrowse({ isMap, isFullscreen: isMap, search: '' })
+      persistIsMapProperty(isMap)
+
+      onBrowse({
+        isMap,
+        isFullscreen: isMap,
+        search: '',
+        // Forces the onlyOnSale property in the defined cases so the users can see LAND on sale.
+        onlyOnSale:
+          (!onlyOnSale && onlyOnRent === false) ||
+          (onlyOnSale === undefined && onlyOnRent === undefined) ||
+          onlyOnSale
+      })
     },
-    [onBrowse]
+    [onBrowse, onlyOnSale, onlyOnRent]
   )
 
   const handleOrderByDropdownChange = useCallback(
@@ -113,30 +166,16 @@ const NFTFilters = (props: Props) => {
     [onBrowse]
   )
 
+  const handleStatusByDropdownChange = useCallback(
+    (_, props: DropdownProps) => {
+      browseRentedLAND(onBrowse, props.value as LANDFilters)
+    },
+    [onBrowse]
+  )
+
   const handleTypeByDropdownChange = useCallback(
     (_, props: DropdownProps) => {
       onBrowse({ assetType: props.value as AssetType })
-    },
-    [onBrowse]
-  )
-
-  const handleRaritiesChange = useCallback(
-    (options: string[]) => {
-      onBrowse({ rarities: options as Rarity[] })
-    },
-    [onBrowse]
-  )
-
-  const handleGendersChange = useCallback(
-    (options: string[]) => {
-      onBrowse({ wearableGenders: options as WearableGender[] })
-    },
-    [onBrowse]
-  )
-
-  const handleCollectionsChange = useCallback(
-    (contract?: string) => {
-      onBrowse({ contracts: contract ? [contract] : undefined })
     },
     [onBrowse]
   )
@@ -150,19 +189,13 @@ const NFTFilters = (props: Props) => {
     [search, onBrowse]
   )
 
-  const handleNetworkChange = useCallback(
-    (newNetwork: Network) => {
-      if (network !== newNetwork) {
-        onBrowse({ network: newNetwork })
-      }
-    },
-    [network, onBrowse]
+  useEffect(
+    () =>
+      setShowFiltersMenu(
+        category === NFTCategory.WEARABLE || category === NFTCategory.EMOTE
+      ),
+    [category, setShowFiltersMenu]
   )
-
-  useEffect(() => setShowFiltersMenu(category === NFTCategory.WEARABLE), [
-    category,
-    setShowFiltersMenu
-  ])
 
   const searchPlaceholder = isMap
     ? t('nft_filters.search_land')
@@ -179,6 +212,9 @@ const NFTFilters = (props: Props) => {
               })
       })
 
+  const toggleBoxI18nKey =
+    view && isAccountView(view) ? 'account_page' : 'browse_page'
+
   return (
     <div className="NFTFilters">
       <div className="topbar">
@@ -193,12 +229,14 @@ const NFTFilters = (props: Props) => {
               minWidth={Responsive.onlyTablet.minWidth}
               className="topbar-filter"
             >
-              <Radio
-                toggle
-                checked={onlyOnSale}
-                onChange={handleOnlyOnSaleChange}
-                label={t('nft_filters.on_sale')}
-              />
+              {shouldShowOnSaleFilter ? (
+                <Radio
+                  toggle
+                  checked={onlyOnSale}
+                  onChange={handleOnlyOnSaleChange}
+                  label={t('nft_filters.on_sale')}
+                />
+              ) : null}
             </Responsive>
           </>
         ) : (
@@ -224,10 +262,20 @@ const NFTFilters = (props: Props) => {
               minWidth={Responsive.onlyTablet.minWidth}
               className="topbar-filter"
             >
+              {view === View.CURRENT_ACCOUNT ? (
+                <Dropdown
+                  direction="left"
+                  className="topbar-dropdown"
+                  value={currentLANDStatus}
+                  options={landStatusDropdown}
+                  onChange={handleStatusByDropdownChange}
+                />
+              ) : null}
               <Dropdown
                 direction="left"
+                className="topbar-dropdown"
                 value={sortBy}
-                options={orderBydropdownOptions}
+                options={orderByDropdownOptions}
                 onChange={handleOrderByDropdownChange}
               />
             </Responsive>
@@ -235,12 +283,14 @@ const NFTFilters = (props: Props) => {
               minWidth={Responsive.onlyTablet.minWidth}
               className="topbar-filter"
             >
-              <Radio
-                toggle
-                checked={onlyOnSale}
-                onChange={handleOnlyOnSaleChange}
-                label={t('nft_filters.on_sale')}
-              />
+              {shouldShowOnSaleFilter ? (
+                <Radio
+                  toggle
+                  checked={onlyOnSale}
+                  onChange={handleOnlyOnSaleChange}
+                  label={t('nft_filters.on_sale')}
+                />
+              ) : null}
             </Responsive>
           </>
         )}
@@ -259,9 +309,7 @@ const NFTFilters = (props: Props) => {
           </div>
         </Responsive>
 
-        {section === Section.LAND ||
-        section === Section.PARCELS ||
-        section === Section.ESTATES ? (
+        {isLandSection(section) && !isAccountView(view!) ? (
           <div className="topbar-filter">
             <div className="toggle-map">
               <Chip
@@ -282,24 +330,28 @@ const NFTFilters = (props: Props) => {
       </div>
 
       {showFiltersMenu ? (
-        <Responsive
-          minWidth={Responsive.onlyTablet.minWidth}
-          className="filters"
-        >
-          <FiltersMenu
-            assetType={assetType}
-            selectedNetwork={network}
-            selectedCollection={contracts[0]}
-            selectedRarities={rarities}
-            selectedGenders={wearableGenders}
-            isOnlySmart={!!onlySmart}
-            onCollectionsChange={handleCollectionsChange}
-            onGendersChange={handleGendersChange}
-            onRaritiesChange={handleRaritiesChange}
-            onNetworkChange={handleNetworkChange}
-            onOnlySmartChange={handleToggleOnlySmart}
+        <>
+          <ToggleBox
+            direction="row"
+            className="result-type-toggle-flex"
+            items={[
+              {
+                title: t(`${toggleBoxI18nKey}.primary_market_title`),
+                active: assetType === AssetType.ITEM,
+                description: t(`${toggleBoxI18nKey}.primary_market_subtitle`),
+                onClick: () => onBrowse({ assetType: AssetType.ITEM }),
+                icon: <div className="market-icon" />
+              },
+              {
+                title: t(`${toggleBoxI18nKey}.secondary_market_title`),
+                active: assetType === AssetType.NFT,
+                description: t(`${toggleBoxI18nKey}.secondary_market_subtitle`),
+                onClick: () => onBrowse({ assetType: AssetType.NFT }),
+                icon: <div className="listings-icon" />
+              }
+            ]}
           />
-        </Responsive>
+        </>
       ) : null}
 
       <Modal
@@ -321,7 +373,7 @@ const NFTFilters = (props: Props) => {
               </div>
             </div>
           )}
-          {category === NFTCategory.WEARABLE ? (
+          {showFiltersMenu ? (
             <>
               <div className="filter-row">
                 <Header sub>{t('filters.type')}</Header>
@@ -332,19 +384,6 @@ const NFTFilters = (props: Props) => {
                   onChange={handleTypeByDropdownChange}
                 />
               </div>
-              <FiltersMenu
-                assetType={assetType}
-                selectedNetwork={network}
-                selectedCollection={contracts[0]}
-                selectedRarities={rarities}
-                selectedGenders={wearableGenders}
-                isOnlySmart={!!onlySmart}
-                onCollectionsChange={handleCollectionsChange}
-                onGendersChange={handleGendersChange}
-                onRaritiesChange={handleRaritiesChange}
-                onNetworkChange={handleNetworkChange}
-                onOnlySmartChange={handleToggleOnlySmart}
-              />
             </>
           ) : null}
           <div className="filter-row">
@@ -352,18 +391,31 @@ const NFTFilters = (props: Props) => {
             <Dropdown
               direction="left"
               value={sortBy}
-              options={orderBydropdownOptions}
+              options={orderByDropdownOptions}
               onChange={handleOrderByDropdownChange}
             />
           </div>
-          <div className="filter-row">
-            <Header sub>{t('nft_filters.on_sale')}</Header>
-            <Radio
-              toggle
-              checked={onlyOnSale}
-              onChange={handleOnlyOnSaleChange}
-            />
-          </div>
+          {section && isLandSection(section) ? (
+            <div className="filter-row">
+              <Header sub>{t('filters.status')}</Header>
+              <Dropdown
+                direction="left"
+                value={currentLANDStatus}
+                options={landStatusDropdown}
+                onChange={handleStatusByDropdownChange}
+              />
+            </div>
+          ) : null}
+          {shouldShowOnSaleFilter ? (
+            <div className="filter-row">
+              <Header sub>{t('nft_filters.on_sale')}</Header>
+              <Radio
+                toggle
+                checked={onlyOnSale}
+                onChange={handleOnlyOnSaleChange}
+              />
+            </div>
+          ) : null}
           <NFTSidebar />
           <Button
             className="apply-filters"

@@ -6,6 +6,7 @@ export enum Section {
   ESTATES = 'estates',
   WEARABLES = 'wearables',
 
+  WEARABLES_TRENDING = 'wearables_trending',
   WEARABLES_HEAD = 'wearables_head',
   WEARABLES_EYEBROWS = 'wearables_eyebrows',
   WEARABLES_EYES = 'wearables_eyes',
@@ -16,6 +17,7 @@ export enum Section {
   WEARABLES_UPPER_BODY = 'wearables_upper_body',
   WEARABLES_LOWER_BODY = 'wearables_lower_body',
   WEARABLES_FEET = 'wearables_feet',
+  WEARABLES_HANDS = 'wearables_hands',
 
   WEARABLES_ACCESSORIES = 'wearables_accessories',
   WEARABLES_EARRING = 'wearables_earring',
@@ -29,11 +31,23 @@ export enum Section {
   WEARABLES_SKIN = 'wearables_skin',
 
   EMOTES = 'emotes',
+  EMOTES_DANCE = 'emotes_dance',
+  EMOTES_STUNT = 'emotes_stunt',
+  EMOTES_GREETINGS = 'emotes_greetings',
+  EMOTES_FUN = 'emotes_fun',
+  EMOTES_POSES = 'emotes_poses',
+  EMOTES_REACTIONS = 'emotes_reactions',
+  EMOTES_HORROR = 'emotes_horror',
+  EMOTES_MISCELLANEOUS = 'emotes_miscellaneous',
+
   ENS = 'ens',
 
   COLLECTIONS = 'collections',
   ON_SALE = 'on_sale',
+  ON_RENT = 'on_rent',
+  RECENTLY_SOLD = 'recently_sold',
   SALES = 'sales',
   BIDS = 'bids',
-  STORE_SETTINGS = 'store_settings'
+  STORE_SETTINGS = 'store_settings',
+  LISTS = 'lists'
 }

@@ -14,6 +14,10 @@ import {
   FETCH_NFT_SUCCESS
 } from '../nft/actions'
 import {
+  AcceptRentalListingSuccessAction,
+  ACCEPT_RENTAL_LISTING_SUCCESS
+} from '../rental/actions'
+import {
   CancelOrderFailureAction,
   CancelOrderRequestAction,
   CancelOrderSuccessAction,
@@ -29,19 +33,36 @@ import {
   ExecuteOrderFailureAction,
   ExecuteOrderRequestAction,
   ExecuteOrderSuccessAction,
+  ExecuteOrderWithCardFailureAction,
+  ExecuteOrderWithCardRequestAction,
+  ExecuteOrderWithCardSuccessAction,
   EXECUTE_ORDER_FAILURE,
   EXECUTE_ORDER_REQUEST,
-  EXECUTE_ORDER_SUCCESS
+  EXECUTE_ORDER_SUCCESS,
+  EXECUTE_ORDER_WITH_CARD_FAILURE,
+  EXECUTE_ORDER_WITH_CARD_REQUEST,
+  EXECUTE_ORDER_WITH_CARD_SUCCESS,
+  ClearOrderErrorsAction,
+  CLEAR_ORDER_ERRORS,
+  FETCH_LEGACY_ORDERS_REQUEST,
+  FetchLegacyOrdersRequestAction,
+  FetchLegacyOrdersFailureAction,
+  FetchLegacyOrdersSuccessAction,
+  FETCH_LEGACY_ORDERS_SUCCESS,
+  FETCH_LEGACY_ORDERS_FAILURE
 } from './actions'
+import { LegacyOrderFragment } from './types'
 
 export type OrderState = {
   data: Record<string, Order>
+  dataLegacy: Record<string, LegacyOrderFragment>
   loading: LoadingState
   error: string | null
 }
 
-const INITIAL_STATE = {
+export const INITIAL_STATE: OrderState = {
   data: {},
+  dataLegacy: {},
   loading: [],
   error: null
 }
@@ -57,9 +78,17 @@ type OrderReducerAction =
   | ExecuteOrderRequestAction
   | ExecuteOrderFailureAction
   | ExecuteOrderSuccessAction
+  | ExecuteOrderWithCardRequestAction
+  | ExecuteOrderWithCardFailureAction
+  | ExecuteOrderWithCardSuccessAction
   | CancelOrderRequestAction
   | CancelOrderFailureAction
   | CancelOrderSuccessAction
+  | AcceptRentalListingSuccessAction
+  | ClearOrderErrorsAction
+  | FetchLegacyOrdersRequestAction
+  | FetchLegacyOrdersSuccessAction
+  | FetchLegacyOrdersFailureAction
 
 export function orderReducer(
   state: OrderState = INITIAL_STATE,
@@ -68,7 +97,9 @@ export function orderReducer(
   switch (action.type) {
     case CREATE_ORDER_REQUEST:
     case EXECUTE_ORDER_REQUEST:
+    case EXECUTE_ORDER_WITH_CARD_REQUEST:
     case CANCEL_ORDER_REQUEST:
+    case FETCH_LEGACY_ORDERS_REQUEST:
     case FETCH_NFTS_REQUEST: {
       return {
         ...state,
@@ -77,6 +108,7 @@ export function orderReducer(
     }
     case CREATE_ORDER_SUCCESS:
     case EXECUTE_ORDER_SUCCESS:
+    case EXECUTE_ORDER_WITH_CARD_SUCCESS:
     case CANCEL_ORDER_SUCCESS: {
       return {
         ...state,
@@ -100,6 +132,8 @@ export function orderReducer(
     }
     case CREATE_ORDER_FAILURE:
     case EXECUTE_ORDER_FAILURE:
+    case FETCH_LEGACY_ORDERS_FAILURE:
+    case EXECUTE_ORDER_WITH_CARD_FAILURE:
     case CANCEL_ORDER_FAILURE:
     case FETCH_NFTS_FAILURE: {
       return {
@@ -113,6 +147,7 @@ export function orderReducer(
       if (order) {
         return {
           ...state,
+          loading: loadingReducer(state.loading, action),
           data: {
             ...state.data,
             [order.id]: order
@@ -120,6 +155,43 @@ export function orderReducer(
         }
       }
       return state
+    }
+    case ACCEPT_RENTAL_LISTING_SUCCESS: {
+      const { rental } = action.payload
+      const newState = {
+        ...state,
+        data: Object.fromEntries(
+          Object.entries(state.data).filter(
+            ([_key, value]) =>
+              !(
+                value.contractAddress === rental.contractAddress &&
+                value.tokenId === rental.tokenId
+              )
+          )
+        )
+      }
+      return newState
+    }
+
+    case FETCH_LEGACY_ORDERS_SUCCESS: {
+      const { orders } = action.payload
+      return {
+        ...state,
+        dataLegacy: {
+          ...state.dataLegacy,
+          ...orders.reduce((obj, order) => {
+            obj[order.id] = order
+            return obj
+          }, {} as Record<string, LegacyOrderFragment>)
+        },
+        loading: loadingReducer(state.loading, action)
+      }
+    }
+    case CLEAR_ORDER_ERRORS: {
+      return {
+        ...state,
+        error: null
+      }
     }
     default:
       return state
