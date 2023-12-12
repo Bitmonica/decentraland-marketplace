@@ -6,6 +6,7 @@
     "load_more": "Cargar Más",
     "not_found": "No se ha encontrado",
     "parcel": "Parcela",
+    "parcel_count": "{count} {count, plural, one {Parcela} other {Parcelas}}",
     "parcel_with_coords": "Parcela {x},{y}",
     "estate": "Estate",
     "wearable": "Vestimenta",
@@ -20,7 +21,38 @@
     "update": "Actualizar",
     "search": "Buscar",
     "apply": "Aplicar",
-    "network": "Red"
+    "network": "Red",
+    "issue_number": "Número de emisión",
+    "primary": "Primaria",
+    "secondary": "Secundaria",
+    "item": "Item",
+    "type": "Tipo",
+    "sale_type": "Tipo de venta",
+    "sell_price": "Precio de venta",
+    "no_results": "Sin resultados",
+    "learn_more": "Aprende Más",
+    "category": "Categoria",
+    "rarity": "Rareza",
+    "stock": "Stock",
+    "price": "Precio",
+    "collection": "Colección",
+    "time": "Tiempo",
+    "buyer": "Comprador",
+    "bid": "Oferta",
+    "order": "Clasificado",
+    "mint": "Venta",
+    "back": "Volver",
+    "emote": "Emote"
+  },
+  "address": {
+    "invalid_address": "Dirección inválida",
+    "ens_not_resolved": "Nombre ENS inválido"
+  },
+  "error_boundary": {
+    "message": "Oops! Algo salió mal..."
+  },
+  "estate_detail": {
+    "dissolved": "Este Estate ha sido disuelto"
   },
   "vendors": {
     "decentraland": "Decentraland",
@@ -29,9 +61,10 @@
     "known_origin": "KnownOrigin"
   },
   "navigation": {
-    "decentraland": "Decentraland",
+    "land": "Land",
+    "collectibles": "Coleccionables",
     "partners": "Socios",
-    "my_assets": "Mi Inventario",
+    "my_store": "Mi Tienda",
     "my_bids": "Mis Ofertas",
     "activity": "Actividad"
   },
@@ -50,7 +83,7 @@
     "wearables_upper_body": "Torso",
     "wearables_lower_body": "Piernas",
     "wearables_feet": "Piez",
-    "wearables_accesories": "Accesorios",
+    "wearables_accessories": "Accesorios",
     "wearables_earring": "Aros",
     "wearables_eyewear": "Gafas",
     "wearables_hat": "Sombreros",
@@ -58,11 +91,18 @@
     "wearables_mask": "Mascaras",
     "wearables_tiara": "Tiara",
     "wearables_top_head": "Tope de la cabeza",
+    "wearables_skin": "Skin",
+    "emotes": "Emotes",
     "ens": "Nombres",
     "decentraland": "Decentraland",
     "super_rare": "SuperRare",
     "known_origin": "KnownOrigin",
-    "makers_place": "MakersPlace"
+    "makers_place": "MakersPlace",
+    "collections": "Colecciones",
+    "on_sale": "En venta",
+    "sales": "Ventas",
+    "bids": "Ofertas",
+    "store_settings": "Configuración"
   },
   "vendor_menu": {
     "no_assets": "Sin assets",
@@ -70,19 +110,67 @@
     "more_than_assets_count": "+{count} assets"
   },
   "filters": {
+    "type": "Tipo",
+    "item": "Creaciones originales",
+    "nft": "Artículos de reventa",
     "name": "Nombre",
     "newest": "Más nuevos",
     "recently_listed": "Listados recientemente",
-    "cheapest": "Más baratos"
+    "recently_sold": "Vendidos recientemente",
+    "cheapest": "Más baratos",
+    "no_results": "No se encontraron resultados.",
+    "clear": "Borrar filtros",
+    "recently_reviewed": "Revisado recientemente",
+    "size": "Tamaño"
   },
   "home_page": {
     "title": "Mercado de Decentraland",
     "subtitle": "Bienvenido al mercado virtual de Decentraland, donde encontrarás los mejores ítems virtuales.",
     "get_started": "Comienza a navegar",
-    "learn_more": "Aprende Más",
-    "home_wearables": "Vestimenta",
+    "home_items": "Últimos items",
+    "home_sold_items": "Últimas ventas",
+    "home_wearables": "Listado recientemente",
     "home_land": "Land",
     "home_ens": "Nombres"
+  },
+  "collection_page": {
+    "no_collection": "No Collection",
+    "unlist_from_market": "Cancelar venta",
+    "list_on_market": "Poner en venta",
+    "edit_in_builder": "Editar en el builder",
+    "on_sale": "En Venta",
+    "edit_price": "Editar precio",
+    "mint_item": "Acuñar item"
+  },
+  "store_settings": {
+    "settings": "Configuración",
+    "see_store_as_guest": "Ver tienda como invitado",
+    "store_cover": "Imagen de la tienda",
+    "description": "Descripción",
+    "website": "Pagina Web",
+    "link_start_with_error": "El link debe comenzar con {value}",
+    "size_error": "El tamaño máximo permitido es de {max}, el archivo seleccionado tiene {current}",
+    "facebook": "Handle de Facebook",
+    "twitter": "Handle de Twitter",
+    "discord": "ID del canal de Discord",
+    "save": "Guardar",
+    "revert": "Revertir",
+    "add_cover_picture": "Haga click aquí para ponerle una imagen a la tienda",
+    "unsaved_changes": "Perderá todos los cambios no guardados, ¿está seguro de que desea continuar?"
+  },
+  "external_link_modal": {
+    "header": "Estas saliendo de Decentraland",
+    "before_link": "Al hacer clic en ACEPTAR, serás redirigido a:",
+    "after_link": "Por favor, fíjese que el link no contenga nada sospechoso para así no ser víctima de un ataque."
+  },
+  "sales": {
+    "stats": "Estadisticas",
+    "total_sales": "Cantidad de ventas",
+    "total_earnings": "Ganancias totales",
+    "royalties": "Ganancias por regalias",
+    "ethereum_earnings": "Ganancias en Ethereum",
+    "polygon_earnings": "Ganancias en Polygon",
+    "activity": "Actividad"
   },
   "partners_page": {
     "partners": "Socios",
@@ -107,7 +195,8 @@
     "collection": "Colección",
     "all_collections": "Todas las colecciones",
     "network": "Red",
-    "all_networks": "Todas las redes"
+    "all_networks": "Todas las redes",
+    "smart_wearables": "Vestimentas Interactivas"
   },
   "nft_card": {
     "expires_at": "Expira {date}"
@@ -116,25 +205,53 @@
     "categories": "Categorías",
     "back": "Atrás"
   },
-  "nft_page": {
+  "account_sidebar": {
+    "assets": "INVENTARIO",
+    "store": "TIENDA",
+    "originals": "Originales",
+    "originals_detail": "Creaciones del usuario",
+    "listings": "Coleccionables",
+    "listings_detail": "Adquiridos por el usuario"
+  },
+  "on_sale_list": {
+    "search": "Buscar entre {count} items..."
+  },
+  "collection_list": {
+    "search": "Buscar {count} collecciones...",
+    "item_count": "{count} items"
+  },
+  "asset_page": {
+    "actions": {
+      "cancel_sale": "Borrar publicación",
+      "manage": "Gestionar",
+      "update": "Actualizar precio",
+      "buy": "Comprar",
+      "mint": "Comprar",
+      "bid": "Ofertar",
+      "see_listing": "Ver publicación",
+      "sell": "Vender",
+      "transfer": "Transferir",
+      "leaving_decentraland": "Saliendo de Decentraland",
+      "leaving_decentraland_description": "Aún no se pueden publicar o actualizar {vendor} assets en el Marketplace de Decentraland. ¿Quiere proceder a {vendor_link} para publicarlo ahí?",
+      "leaving_decentraland_disclaimer": "Tus NFTs van a listarse en el Marketplace de Decentraland",
+      "edit_price": "Editar precio",
+      "change_beneficiary": "Cambiar de beneficiario",
+      "mint_item": "Acuñar item"
+    },
     "description": "Descripción",
     "owner": "Dueño",
+    "creator": "Creador",
     "price": "Precio",
-    "expires": "Expira en",
-    "cancel_sale": "Borrar publicación",
-    "buy": "Comprar",
-    "sell": "Vender",
-    "see_listing": "Ver publicación",
-    "bid": "Ofertar",
-    "update": "Actualizar precio",
-    "transfer": "Transferir",
+    "collection": "Colección",
+    "available": "Disponible",
+    "stock": "Stock",
+    "expires": "Expira",
     "plaza": "Plaza",
     "road": "Calle",
     "district": "Distrito",
-    "leaving_decentraland": "Saliendo de Decentraland",
-    "leaving_decentraland_description": "Aún no se pueden publicar o actualizar {vendor} assets en el Marketplace de Decentraland. ¿Quiere proceder a {vendor_link} para publicarlo ahí?",
-    "leaving_decentraland_disclaimer": "Tus NFTs van a listarse en el Marketplace de Decentraland",
-    "part_of_estate": "Parte de {estate_name}"
+    "jump_in": "Ingresar",
+    "part_of_estate": "Parte de {estate_name}",
+    "sold_out": "Sin Stock"
   },
   "proximity": {
     "adjacent": "Adyacente",
@@ -151,36 +268,37 @@
     "invalid_fingerprint_on_bid_placed": "Este artículo ha sido modificado desde que realizaste esta oferta y ya no es valida, a menos que la actualices"
   },
   "transaction_history": {
-    "title": "Historial de Transacciones",
+    "title": "Últimas ventas",
     "from": "Vendedor",
     "to": "Comprador",
+    "type": "Tipo",
     "when": "Fecha",
     "price": "Precio"
   },
+  "body_shape": {
+    "male": "Hombre",
+    "female": "Mujer",
+    "unisex": "Unisex"
+  },
+  "rarity": {
+    "unique": "Único",
+    "mythic": "Mítico",
+    "legendary": "Legendario",
+    "epic": "Épico",
+    "rare": "Raro",
+    "uncommon": "Poco común",
+    "common": "Común"
+  },
+  "rarity_tooltip": {
+    "unique": "Único en su tipo: uno solo en existencia",
+    "mythic": "Para algunos pocos: máximo 10",
+    "legendary": "Edición limitada: máximo 100",
+    "epic": "Suministro máximo: 1000",
+    "rare": "Suministro máximo: 5000",
+    "uncommon": "Suministro máximo: 10.000",
+    "common": "Suministro máximo: 100.000"
+  },
   "wearable": {
-    "body_shape": {
-      "male": "Hombre",
-      "female": "Mujer",
-      "unisex": "Unisex"
-    },
-    "rarity": {
-      "unique": "Único",
-      "mythic": "Mítico",
-      "legendary": "Legendario",
-      "epic": "Épico",
-      "rare": "Raro",
-      "uncommon": "Poco común",
-      "common": "Común"
-    },
-    "rarity_tooltip": {
-      "unique": "Único en su tipo: uno solo en existencia",
-      "mythic": "Para algunos pocos: máximo 10",
-      "legendary": "Edición limitada: máximo 100",
-      "epic": "Suministro máximo: 1000",
-      "rare": "Suministro máximo: 5000",
-      "uncommon": "Suministro máximo: 10.000",
-      "common": "Suministro máximo: 100.000"
-    },
     "category": {
       "body_shape": "Cuerpo",
       "earring": "Aros",
@@ -197,7 +315,19 @@
       "mouth": "Boca",
       "tiara": "Tiara",
       "top_head": "Cabeza",
-      "upper_body": "Torso"
+      "upper_body": "Torso",
+      "skin": "Skin"
+    },
+    "smart": "Vestimenta Interactiva",
+    "smart_badge": "Interactivo"
+  },
+  "wearable_preview": {
+    "toggle_wearable": "Vestimenta",
+    "toggle_avatar": "Pruébatelo",
+    "missing_representation_error": {
+      "male": "hombre",
+      "female": "mujer",
+      "message": "Esta vestimenta no tiene representación de {bodyShape}"
     }
   },
   "sell_page": {
@@ -213,18 +343,30 @@
     "confirm": {
       "title": "Por favor confirma",
       "line_one": "Estás por poner en venta {name} por {amount}.",
-      "line_two": "Por favor vuelve a escribir el precio para confirmar:"
+      "line_two": "Por favor vuelve a escribir el precio para confirmar:",
+      "warning": "Cuidado: este precio esta muy por debajo al valor de mercado"
     }
   },
   "buy_page": {
     "title": "Comprar {category}",
     "subtitle": "Estás por comprar {name} por {amount}.",
     "not_for_sale": "{name} no esta en venta.",
-    "price_too_high": "Dados los precios de cambio actuales, comprar {category} te costará un {percentageIncrease}% más de su precio normal",
-    "please_wait": "Por favor espere a que los precios se normalicen nuevamente",
-    "actual_price": "El precio arriba es una aproximación, tomando los precios de cambio actuales terminarás pagando al rededor de {computedPrice}",
     "buy": "Comprar",
-    "proceed_anyways": "Proceder",
+    "no_fingerprint": "No se pudo cargar la identificación del Estate.",
+    "is_owner": "Ya eres el dueño de {name}.",
+    "not_enough_mana": "No tienes suficiente MANA para comprar {name} por {amount}."
+  },
+  "price_too_low": {
+    "minimum_price": "La cantidad mínima admitida para transacciones sin costo es {price}",
+    "get_item_in_network": "Para obtener este item, deberá cambiar su red a {network} y luego cubrir el costo de la transacción con {token}.",
+    "switch_network": "Cambiar a {red}"
+  },
+  "mint_page": {
+    "title": "Comprar {category}",
+    "subtitle": "Estás por comprar {name} por {amount}.",
+    "not_for_sale": "{name} no esta disponible, pero puedes buscarlo en el {secondary_market_link}.",
+    "secondary_market": "mercado secundario",
+    "action": "Comprar",
     "no_fingerprint": "No se pudo cargar la identificación del Estate.",
     "is_owner": "Ya eres el dueño de {name}.",
     "not_enough_mana": "No tienes suficiente MANA para comprar {name} por {amount}."
@@ -236,7 +378,13 @@
     "expiration_date": "Fecha de expiración",
     "invalid_date": "Esta fecha ya pasó",
     "not_enougn_mana": "No tienes suficiente MANA",
-    "submit": "Ofertar"
+    "submit": "Ofertar",
+    "confirm": {
+      "title": "Por favor confirma",
+      "create_bid_line_one": "Estás por hacer una oferta en {name} por {amount}.",
+      "accept_bid_line_one": "Estás por aceptar una oferta en {name} por {amount}.",
+      "accept_bid_line_two": "Por favor vuelve a escribir el precio para confirmar:"
+    }
   },
   "my_bids_page": {
     "bids_received": "Ofertas recibidas",
@@ -257,10 +405,20 @@
     "invalid_owner": "No eres el dueño de {name}.",
     "submit": "Confirmar"
   },
+  "browse_page": {
+    "primary_market_title": "Tienda",
+    "primary_market_subtitle": "Creados por los usuarios",
+    "secondary_market_title": "Clasificados",
+    "secondary_market_subtitle": "Artículos de reventa"
+  },
   "account_page": {
     "copied": "Copiado ✔",
     "copied_capitalized": "COPIADO ✔",
-    "copy_address": "COPIAR DIRECCIÓN"
+    "copy_address": "COPIAR DIRECCIÓN",
+    "primary_market_title": "Creaciones",
+    "primary_market_subtitle": "Creado por este usuario",
+    "secondary_market_title": "Colecciones",
+    "secondary_market_subtitle": "Colleccionado por este usuario"
   },
   "settings_page": {
     "authorizations": "Autorizaciones",
@@ -307,8 +465,8 @@
   },
   "transaction": {
     "action": {
-      "approved": "Aprobada",
-      "not_approved": "Desaprobada"
+      "approved": "aprobadó",
+      "unapproved": "desaprobó"
     },
     "detail": {
       "approve_token": "{action} al contrato de {contract} para que opere tokens de {token} por tí.",
@@ -346,6 +504,10 @@
     "ethereum": "Ethereum",
     "matic": "Polygon"
   },
+  "tokens": {
+    "ethereum": "ETH",
+    "matic": "MATIC"
+  },
   "intro_popup": {
     "title": "Introducimos Polygon MANA",
     "blog_link": "blog post",
@@ -356,8 +518,16 @@
   },
   "toast": {
     "meta_transaction_failure": {
-      "title": "Meta transacción",
+      "title": "Error de Meta transacción",
       "body": "Ocurrió un error publicando la meta transacción.{br}Intentelo de nuevo o ingrese a nuestro {discord_link} para obtener más información."
+    },
+    "contract_account": {
+      "title": "No soportado",
+      "body": "Las billeteras basadas en smart contracts no soportan meta-transacciones"
+    },
+    "store_update_success": {
+      "title": "Éxito",
+      "body": "Configuración de tienda actualizada correctamente"
     }
   }
 }

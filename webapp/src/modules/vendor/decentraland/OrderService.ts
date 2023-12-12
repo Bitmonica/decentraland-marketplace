@@ -1,109 +1,78 @@
-import { Address } from 'web3x-es/address'
-import { toWei } from 'web3x-es/utils'
-import { ContractName, getContract } from 'decentraland-transactions'
+import { utils } from 'ethers'
+import { ListingStatus, Network, Order } from '@dcl/schemas'
+import {
+  ContractName,
+  getContract,
+  getContractName
+} from 'decentraland-transactions'
 import { Wallet } from 'decentraland-dapps/dist/modules/wallet/types'
-import { Marketplace } from '../../../contracts/Marketplace'
-import { ContractFactory } from '../../contract/ContractFactory'
+import { sendTransaction } from 'decentraland-dapps/dist/modules/wallet/utils'
 import { NFT } from '../../nft/types'
-import { Order, OrderStatus } from '../../order/types'
 import { orderAPI } from './order/api'
 import { VendorName } from '../types'
 import { OrderService as OrderServiceInterface } from '../services'
-import { sendTransaction } from '../../wallet/utils'
 
 export class OrderService
   implements OrderServiceInterface<VendorName.DECENTRALAND> {
-  async fetchByNFT(nft: NFT, status?: OrderStatus) {
-    const orders = await orderAPI.fetchByNFT(
-      nft.contractAddress,
-      nft.tokenId,
-      status
-    )
-    return orders as Order[]
+  fetchByNFT(nft: NFT, status?: ListingStatus): Promise<Order[]> {
+    return orderAPI.fetchByNFT(nft.contractAddress, nft.tokenId, status)
   }
 
   async create(
-    wallet: Wallet | null,
+    _wallet: Wallet | null,
     nft: NFT,
     price: number,
     expiresAt: number
   ) {
-    const contractData = getContract(ContractName.Marketplace, nft.chainId)
-    const marketplace = await this.getMarketplaceContract(contractData.address)
-
-    if (!wallet) {
-      throw new Error('Invalid address. Wallet must be connected.')
-    }
-    const from = Address.fromString(wallet.address)
-
-    const createOrder = marketplace.methods.createOrder(
-      Address.fromString(nft.contractAddress),
-      nft.tokenId,
-      toWei(price.toString(), 'ether'),
-      expiresAt
+    const contract = getContract(
+      nft.network === Network.ETHEREUM
+        ? ContractName.Marketplace
+        : ContractName.MarketplaceV2,
+      nft.chainId
     )
-
-    return sendTransaction(createOrder, contractData, from)
+    return sendTransaction(contract, marketplace =>
+      marketplace.createOrder(
+        nft.contractAddress,
+        nft.tokenId,
+        utils.parseEther(price.toString()),
+        expiresAt
+      )
+    )
   }
 
   async execute(
-    wallet: Wallet | null,
+    _wallet: Wallet | null,
     nft: NFT,
     order: Order,
     fingerprint?: string
   ) {
-    const contractData = getContract(ContractName.Marketplace, nft.chainId)
-    const marketplace = await this.getMarketplaceContract(contractData.address)
-    const { price } = order
-
-    if (!wallet) {
-      throw new Error('Invalid address. Wallet must be connected.')
-    }
-    const from = Address.fromString(wallet.address)
-
+    const contractName = getContractName(order.marketplaceAddress)
+    const contract = getContract(contractName, order.chainId)
     if (fingerprint) {
-      return marketplace.methods
-        .safeExecuteOrder(
-          Address.fromString(nft.contractAddress),
+      return sendTransaction(contract, marketplace =>
+        marketplace.safeExecuteOrder(
+          nft.contractAddress,
           nft.tokenId,
-          price,
+          order.price,
           fingerprint
         )
-        .send({ from })
-        .getTxHash()
-    } else {
-      const executeOrder = marketplace.methods.executeOrder(
-        Address.fromString(nft.contractAddress),
-        nft.tokenId,
-        price
       )
-
-      return sendTransaction(executeOrder, contractData, from)
+    } else {
+      return sendTransaction(contract, marketplace =>
+        marketplace.executeOrder(nft.contractAddress, nft.tokenId, order.price)
+      )
     }
   }
 
-  async cancel(wallet: Wallet | null, nft: NFT) {
-    const contractData = getContract(ContractName.Marketplace, nft.chainId)
-    const marketplace = await this.getMarketplaceContract(contractData.address)
-
-    if (!wallet) {
-      throw new Error('Invalid address. Wallet must be connected.')
-    }
-
-    const from = Address.fromString(wallet.address)
-    const cancelOrder = marketplace.methods.cancelOrder(
-      Address.fromString(nft.contractAddress),
-      nft.tokenId
+  async cancel(_wallet: Wallet | null, order: Order) {
+    const contractName = getContractName(order.marketplaceAddress)
+    const contract = getContract(contractName, order.chainId)
+    return sendTransaction(contract, marketplace =>
+      marketplace.cancelOrder(order.contractAddress, order.tokenId)
     )
-
-    return sendTransaction(cancelOrder, contractData, from)
   }
 
   canSell() {
     return true
-  }
-
-  private getMarketplaceContract(address: string) {
-    return ContractFactory.build(Marketplace, address)
   }
 }

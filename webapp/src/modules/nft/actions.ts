@@ -1,10 +1,11 @@
 import { action } from 'typesafe-actions'
+import { Order } from '@dcl/schemas'
 import { buildTransactionPayload } from 'decentraland-dapps/dist/modules/transaction/utils'
+import { ErrorCode } from 'decentraland-transactions'
 
 import { SortDirection } from '../routing/types'
-import { Order } from '../order/types'
 import { Account } from '../account/types'
-import { getNFTName } from './utils'
+import { getAssetName } from '../asset/utils'
 import { NFT, NFTSortBy, NFTsFetchOptions, NFTsFetchParams } from './types'
 
 // Fetch NFTs
@@ -88,12 +89,16 @@ export const transferNFTSuccess = (nft: NFT, address: string, txHash: string) =>
     ...buildTransactionPayload(nft.chainId, txHash, {
       tokenId: nft.tokenId,
       contractAddress: nft.contractAddress,
-      name: getNFTName(nft),
+      name: getAssetName(nft),
       address
     })
   })
-export const transferNFTFailure = (nft: NFT, address: string, error: string) =>
-  action(TRANSFER_NFT_FAILURE, { nft, address, error })
+export const transferNFTFailure = (
+  nft: NFT,
+  address: string,
+  error: string,
+  errorCode?: ErrorCode
+) => action(TRANSFER_NFT_FAILURE, { nft, address, error, errorCode })
 
 export type TransferNFTRequestAction = ReturnType<typeof transferNFTRequest>
 export type TransferNFTSuccessAction = ReturnType<typeof transferNFTSuccess>

@@ -1,30 +1,35 @@
-import React, { useState, useEffect } from 'react'
-import { Network, NFTCategory } from '@dcl/schemas'
-import { fromWei } from 'web3x-es/utils'
+import React, { useState } from 'react'
+import { fromWei } from 'web3x/utils'
+import { addDays } from 'date-fns'
 import dateFnsFormat from 'date-fns/format'
+import { Network, NFTCategory } from '@dcl/schemas'
+import { toFixedMANAValue } from 'decentraland-dapps/dist/lib/mana'
 import {
   Authorization,
   AuthorizationType
 } from 'decentraland-dapps/dist/modules/authorization/types'
 import { hasAuthorization } from 'decentraland-dapps/dist/modules/authorization/utils'
 import { t, T } from 'decentraland-dapps/dist/modules/translation/utils'
-import { Header, Form, Field, Button, Modal } from 'decentraland-ui'
+import { ChainButton } from 'decentraland-dapps/dist/containers'
+import { Header, Form, Field, Button } from 'decentraland-ui'
 import { ContractName } from 'decentraland-transactions'
-import { toMANA, fromMANA } from '../../../lib/mana'
+import { parseMANANumber } from '../../../lib/mana'
 import {
   INPUT_FORMAT,
   getDefaultExpirationDate
 } from '../../../modules/order/utils'
-import { getNFTName, isOwnedBy } from '../../../modules/nft/utils'
 import { locations } from '../../../modules/routing/locations'
 import { VendorFactory } from '../../../modules/vendor/VendorFactory'
+import { getAssetName, isOwnedBy } from '../../../modules/asset/utils'
 import { AuthorizationModal } from '../../AuthorizationModal'
-import { NFTAction } from '../../NFTAction'
+import { AssetAction } from '../../AssetAction'
 import { Mana } from '../../Mana'
 import { ManaField } from '../../ManaField'
 import { getContractNames } from '../../../modules/vendor'
 import { getContract } from '../../../modules/contract/utils'
+import { ConfirmInputValueModal } from '../../ConfirmInputValueModal'
 import { Props } from './SellModal.types'
+import { showPriceBelowMarketValueWarning } from './utils'
 
 const SellModal = (props: Props) => {
   const {
@@ -39,25 +44,17 @@ const SellModal = (props: Props) => {
   } = props
 
   const isUpdate = order !== null
-  const [price, setPrice] = useState(
-    isUpdate ? toMANA(+fromWei(order!.price, 'ether')) : ''
+  const [price, setPrice] = useState<string>(
+    isUpdate ? fromWei(order!.price, 'ether') : ''
   )
   const [expiresAt, setExpiresAt] = useState(
     isUpdate && order!.expiresAt
-      ? dateFnsFormat(+order!.expiresAt, INPUT_FORMAT)
+      ? dateFnsFormat(addDays(new Date(+order!.expiresAt), 1), INPUT_FORMAT)
       : getDefaultExpirationDate()
   )
-  const [confirmPrice, setConfirmPrice] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
 
   const [showAuthorizationModal, setShowAuthorizationModal] = useState(false)
-
-  // Clear confirm price when closing the confirm modal
-  useEffect(() => {
-    if (!showConfirm) {
-      setConfirmPrice('')
-    }
-  }, [nft, showConfirm, setConfirmPrice])
 
   if (!wallet) {
     return null
@@ -83,7 +80,7 @@ const SellModal = (props: Props) => {
   }
 
   const handleCreateOrder = () =>
-    onCreateOrder(nft, fromMANA(price), new Date(expiresAt).getTime())
+    onCreateOrder(nft, parseMANANumber(price), new Date(expiresAt).getTime())
 
   const handleSubmit = () => {
     if (hasAuthorization(authorizations, authorization)) {
@@ -99,14 +96,15 @@ const SellModal = (props: Props) => {
   const { orderService } = VendorFactory.build(nft.vendor)
 
   const isInvalidDate = new Date(expiresAt).getTime() < Date.now()
+  const isInvalidPrice = parseMANANumber(price) <= 0
   const isDisabled =
     !orderService.canSell() ||
     !isOwnedBy(nft, wallet) ||
-    fromMANA(price) <= 0 ||
+    isInvalidPrice ||
     isInvalidDate
 
   return (
-    <NFTAction nft={nft}>
+    <AssetAction asset={nft}>
       <Header size="large">
         {t(isUpdate ? 'sell_page.update_title' : 'sell_page.title')}
       </Header>
@@ -114,7 +112,7 @@ const SellModal = (props: Props) => {
         <T
           id={isUpdate ? 'sell_page.update_subtitle' : 'sell_page.subtitle'}
           values={{
-            name: <b className="primary-text">{getNFTName(nft)}</b>
+            name: <b className="primary-text">{getAssetName(nft)}</b>
           }}
         />
       </p>
@@ -124,13 +122,13 @@ const SellModal = (props: Props) => {
           <ManaField
             label={t('sell_page.price')}
             type="text"
-            placeholder={toMANA(1000)}
+            placeholder={1000}
             network={nft.network}
             value={price}
             focus={true}
+            error={price !== '' && isInvalidPrice}
             onChange={(_event, props) => {
-              const newPrice = fromMANA(props.value)
-              setPrice(toMANA(newPrice))
+              setPrice(toFixedMANAValue(props.value))
             }}
           />
           <Field
@@ -153,69 +151,52 @@ const SellModal = (props: Props) => {
           >
             {t('global.cancel')}
           </Button>
-          <Button
+          <ChainButton
             type="submit"
             primary
             disabled={isDisabled || isLoading}
             loading={isLoading}
+            chainId={nft.chainId}
           >
             {t(isUpdate ? 'sell_page.update_submit' : 'sell_page.submit')}
-          </Button>
+          </ChainButton>
         </div>
       </Form>
-
-      <Modal size="small" open={showConfirm} className="ConfirmPriceModal">
-        <Modal.Header>{t('sell_page.confirm.title')}</Modal.Header>
-        <Form onSubmit={handleSubmit}>
-          <Modal.Content>
+      <ConfirmInputValueModal
+        open={showConfirm}
+        headerTitle={t('sell_page.confirm.title')}
+        content={
+          <>
             <T
               id="sell_page.confirm.line_one"
               values={{
-                name: <b>{getNFTName(nft)}</b>,
+                name: <b>{getAssetName(nft)}</b>,
                 amount: (
                   <Mana network={nft.network} inline>
-                    {fromMANA(price).toLocaleString()}
+                    {parseMANANumber(price).toLocaleString()}
                   </Mana>
                 )
               }}
             />
+            {showPriceBelowMarketValueWarning(nft, parseMANANumber(price)) && (
+              <>
+                <br />
+                <p className="danger-text">
+                  <T id="sell_page.confirm.warning" />
+                </p>
+              </>
+            )}
             <br />
             <T id="sell_page.confirm.line_two" />
-            <ManaField
-              className="mana-input"
-              label={t('sell_page.price')}
-              network={nft.network}
-              placeholder={price}
-              value={confirmPrice}
-              onChange={(_event, props) => {
-                const newPrice = fromMANA(props.value)
-                setConfirmPrice(toMANA(newPrice))
-              }}
-            />
-          </Modal.Content>
-          <Modal.Actions>
-            <div
-              className="ui button"
-              onClick={() => {
-                setConfirmPrice('')
-                setShowConfirm(false)
-              }}
-            >
-              {t('global.cancel')}
-            </div>
-            <Button
-              type="submit"
-              primary
-              disabled={
-                isCreatingOrder || fromMANA(price) !== fromMANA(confirmPrice)
-              }
-              loading={isCreatingOrder}
-            >
-              {t('global.proceed')}
-            </Button>
-          </Modal.Actions>
-        </Form>
-      </Modal>
+          </>
+        }
+        onConfirm={handleSubmit}
+        valueToConfirm={price}
+        network={nft.network}
+        onCancel={() => setShowConfirm(false)}
+        loading={isCreatingOrder}
+        disabled={isCreatingOrder}
+      />
       <AuthorizationModal
         open={showAuthorizationModal}
         authorization={authorization}
@@ -223,7 +204,7 @@ const SellModal = (props: Props) => {
         onProceed={handleCreateOrder}
         onCancel={handleClose}
       />
-    </NFTAction>
+    </AssetAction>
   )
 }
 

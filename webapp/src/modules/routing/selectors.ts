@@ -1,11 +1,15 @@
 import { createSelector } from 'reselect'
-import { getSearch as getRouterSearch } from 'connected-react-router'
+import {
+  getSearch as getRouterSearch,
+  getLocation
+} from 'connected-react-router'
 import { Network, Rarity } from '@dcl/schemas'
-import { getView } from '../ui/nft/browse/selectors'
+import { getView } from '../ui/browse/selectors'
 import { View } from '../ui/types'
 import { WearableGender } from '../nft/wearable/types'
 import { VendorName } from '../vendor/types'
 import { isVendor } from '../vendor/utils'
+import { Section, Sections } from '../vendor/routing/types'
 import { contracts } from '../contract/utils'
 import { RootState } from '../reducer'
 import {
@@ -13,9 +17,19 @@ import {
   getURLParamArray,
   getURLParam
 } from './search'
-import { SortBy, Section } from './types'
+import { BrowseOptions, SortBy } from './types'
+import { locations } from './locations'
+import { AssetType } from '../asset/types'
+import { getAddress as getWalletAddress } from '../wallet/selectors'
+import { getAddress as getAccountAddress } from '../account/selectors'
 
 export const getState = (state: RootState) => state.routing
+
+const getPathName = createSelector<
+  RootState,
+  ReturnType<typeof getLocation>,
+  string
+>(getLocation, location => location.pathname)
 
 export const getVendor = createSelector<RootState, string, VendorName>(
   getRouterSearch,
@@ -31,14 +45,29 @@ export const getVendor = createSelector<RootState, string, VendorName>(
 export const getSection = createSelector<
   RootState,
   string,
+  ReturnType<typeof getPathName>,
   VendorName,
   Section
->(
-  getRouterSearch,
-  getVendor,
-  (search, vendor) =>
-    getURLParam<Section>(search, 'section') || Section[vendor].ALL
-)
+>(getRouterSearch, getPathName, getVendor, (search, pathname, vendor) => {
+  const section = getURLParam<string>(search, 'section') ?? ''
+  if (!section && pathname === locations.lands()) {
+    return Sections.decentraland.LAND
+  }
+
+  if (
+    (!section || section === Sections[vendor].ALL) &&
+    pathname === locations.browse() &&
+    vendor === VendorName.DECENTRALAND
+  ) {
+    return Sections.decentraland.WEARABLES
+  }
+
+  if (!section || !(section.toUpperCase() in Sections[vendor])) {
+    return Sections[vendor].ALL
+  }
+
+  return section as Section
+})
 
 export const getPage = createSelector<RootState, string, number>(
   getRouterSearch,
@@ -84,11 +113,28 @@ export const getOnlyOnSale = createSelector<
   return result
 })
 
+export const getIsSoldOut = createSelector<
+  RootState,
+  string,
+  boolean | undefined
+>(getRouterSearch, search => {
+  const isSoldOut = getURLParam(search, 'isSoldOut')
+  return isSoldOut === 'true'
+})
+
 export const getIsMap = createSelector<RootState, string, boolean | undefined>(
   getRouterSearch,
   search => {
     const isMap = getURLParam(search, 'isMap')
     return isMap === null ? undefined : isMap === 'true'
+  }
+)
+
+export const getItemId = createSelector<RootState, string, string | undefined>(
+  getRouterSearch,
+  search => {
+    const itemId = getURLParam(search, 'isSoldOut')
+    return itemId ? itemId : undefined
   }
 )
 
@@ -102,7 +148,7 @@ export const getIsFullscreen = createSelector<
   return isFullscreen === null ? undefined : isMap && isFullscreen === 'true'
 })
 
-export const getWearableRarities = createSelector<RootState, string, Rarity[]>(
+export const getRarities = createSelector<RootState, string, Rarity[]>(
   getRouterSearch,
   search =>
     getURLParamArray<Rarity>(
@@ -148,4 +194,155 @@ export const getNetwork = createSelector<
 >(
   getRouterSearch,
   search => (getURLParam(search, 'network') as Network) || undefined
+)
+
+export const getAssetType = createSelector<
+  RootState,
+  string,
+  string,
+  VendorName,
+  AssetType
+>(getRouterSearch, getPathName, getVendor, (search, pathname, vendor) => {
+  let assetTypeParam = getURLParam(search, 'assetType') ?? ''
+
+  if (!assetTypeParam || !(assetTypeParam.toUpperCase() in AssetType)) {
+    if (vendor === VendorName.DECENTRALAND && pathname === locations.browse()) {
+      return AssetType.ITEM
+    }
+    return AssetType.NFT
+  }
+  return assetTypeParam as AssetType
+})
+
+export const getViewAsGuest = createSelector<RootState, string, boolean>(
+  getRouterSearch,
+  search => getURLParam(search, 'viewAsGuest') === 'true'
+)
+export const getOnlySmart = createSelector<RootState, string, boolean>(
+  getRouterSearch,
+  search => getURLParam(search, 'onlySmart') === 'true'
+)
+
+export const hasFiltersEnabled = createSelector<
+  RootState,
+  string | undefined,
+  WearableGender[],
+  Rarity[],
+  string[],
+  boolean
+>(
+  getNetwork,
+  getWearableGenders,
+  getRarities,
+  getContracts,
+  (network, genders, rarities, contracts) => {
+    const hasNetworkFilter = network !== undefined
+    const hasGenderFilter = genders.length > 0
+    const hasRarityFilter = rarities.length > 0
+    const hasContractsFilter = contracts.length > 0
+    return (
+      hasNetworkFilter ||
+      hasGenderFilter ||
+      hasRarityFilter ||
+      hasContractsFilter
+    )
+  }
+)
+
+export const getCurrentLocationAddress = createSelector<
+  RootState,
+  string,
+  string | undefined,
+  string | undefined,
+  string | undefined
+>(
+  getPathName,
+  getWalletAddress,
+  getAccountAddress,
+  (pathname, walletAddess, accountAddress) => {
+    let address: string | undefined
+
+    if (pathname === locations.currentAccount()) {
+      address = walletAddess
+    } else {
+      address = accountAddress
+    }
+
+    return address ? address.toLowerCase() : undefined
+  }
+)
+
+export const getPaginationUrlParams = createSelector(
+  getPage,
+  getSortBy,
+  getSearch,
+  (page, sortBy, search) => ({ page, sortBy, search })
+)
+
+export const getAssetsUrlParams = createSelector(
+  getOnlyOnSale,
+  getOnlySmart,
+  getIsSoldOut,
+  getItemId,
+  getContracts,
+  (onlyOnSale, onlySmart, isSoldOut, itemId, contracts) => ({
+    onlyOnSale,
+    onlySmart,
+    isSoldOut,
+    itemId,
+    contracts
+  })
+)
+
+export const getLandsUrlParams = createSelector(
+  getIsMap,
+  getIsFullscreen,
+  (isMap, isFullscreen) => ({ isMap, isFullscreen })
+)
+
+export const getWearablesUrlParams = createSelector(
+  getRarities,
+  getWearableGenders,
+  getView,
+  getViewAsGuest,
+  (rarities, wearableGenders, view, viewAsGuest) => ({
+    rarities,
+    wearableGenders,
+    view,
+    viewAsGuest
+  })
+)
+
+export const getCurrentBrowseOptions = createSelector(
+  getAssetType,
+  getCurrentLocationAddress,
+  getVendor,
+  getSection,
+  getNetwork,
+  getPaginationUrlParams,
+  getAssetsUrlParams,
+  getLandsUrlParams,
+  getWearablesUrlParams,
+  (
+    assetType,
+    address,
+    vendor,
+    section,
+    network,
+    paginationUrlParams,
+    AssetsUrlParams,
+    landsUrlParams,
+    wearablesUrlParams
+  ) =>
+    ({
+      assetType,
+      address,
+      vendor,
+      section,
+      network,
+      ...AssetsUrlParams,
+      ...paginationUrlParams,
+      ...landsUrlParams,
+      ...wearablesUrlParams
+    } as BrowseOptions)
 )

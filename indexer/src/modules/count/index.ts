@@ -1,6 +1,7 @@
+import { BigInt } from '@graphprotocol/graph-ts'
 import { NFT, Order, Count } from '../../entities/schema'
 import * as categories from '../category/categories'
-import * as addresses from '../../data/addresses'
+import { ONE_MILLION } from '../utils'
 
 export const DEFAULT_ID = 'all'
 
@@ -14,16 +15,15 @@ export function buildCount(): Count {
     count.orderEstate = 0
     count.orderWearable = 0
     count.orderENS = 0
-
     count.parcelTotal = 0
-
     count.estateTotal = 0
-
     count.wearableTotal = 0
-
     count.ensTotal = 0
-
     count.started = 0
+    count.salesTotal = 0
+    count.salesManaTotal = BigInt.fromI32(0)
+    count.creatorEarningsManaTotal = BigInt.fromI32(0)
+    count.daoEarningsManaTotal = BigInt.fromI32(0)
   }
 
   return count as Count
@@ -60,5 +60,18 @@ export function buildCountFromOrder(order: Order): Count {
   } else if (category == categories.ENS) {
     count.orderENS += 1
   }
+  return count
+}
+
+export function buildCountFromSale(
+  price: BigInt,
+  feesCollectorCut: BigInt
+): Count {
+  let count = buildCount()
+  count.salesTotal += 1
+  count.salesManaTotal = count.salesManaTotal.plus(price)
+  count.daoEarningsManaTotal = count.daoEarningsManaTotal.plus(
+    feesCollectorCut.times(price).div(ONE_MILLION)
+  )
   return count
 }

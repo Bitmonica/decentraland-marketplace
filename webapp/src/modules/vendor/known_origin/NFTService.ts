@@ -1,12 +1,11 @@
 import BN from 'bn.js'
-import { Address } from 'web3x-es/address'
-import { toBN, toWei } from 'web3x-es/utils'
+import { Address } from 'web3x/address'
+import { toWei } from 'web3x/utils'
 import { Wallet } from 'decentraland-dapps/dist/modules/wallet/types'
-import { Network } from '@dcl/schemas'
+import { ListingStatus, Network, Order } from '@dcl/schemas'
 import { ERC721 } from '../../../contracts/ERC721'
 import { ContractFactory } from '../../contract/ContractFactory'
 import { NFT, NFTsFetchParams, NFTsCountParams } from '../../nft/types'
-import { Order, OrderStatus } from '../../order/types'
 import { Account } from '../../account/types'
 import { getNFTId } from '../../nft/utils'
 import { TokenConverter } from '../TokenConverter'
@@ -22,6 +21,7 @@ import { editionAPI } from './edition/api'
 import { tokenAPI } from './token/api'
 import { MAX_QUERY_SIZE } from './api'
 import { AssetType } from './types'
+import { config } from '../../../config'
 
 type Fragment = TokenFragment | EditionFragment
 
@@ -149,18 +149,22 @@ export class NFTService
       },
       category: 'art',
       vendor: VendorName.KNOWN_ORIGIN,
-      chainId: Number(process.env.REACT_APP_CHAIN_ID),
+      chainId: Number(config.get('CHAIN_ID')!),
       network: Network.ETHEREUM,
       issuedId: null,
       itemId: null,
       createdAt: 0,
-      updatedAt: 0
+      updatedAt: 0,
+      soldAt: 0
     }
   }
 
-  toOrder(edition: EditionFragment, oneEthInMANA: string): Order {
+  toOrder(
+    edition: EditionFragment,
+    oneEthInMANA: string
+  ): Order & { ethPrice: string } {
     const totalWei = this.marketplacePrice.addFee(edition.priceInWei)
-    const weiPrice = toBN(totalWei).mul(toBN(oneEthInMANA))
+    const weiPrice = new BN(totalWei).mul(new BN(oneEthInMANA))
     const price = weiPrice.div(this.oneEthInWei)
 
     const contractNames = getContractNames()
@@ -168,7 +172,7 @@ export class NFTService
     const contractAddress = getContract({
       name: contractNames.DIGITAL_ASSET
     }).address
-    const marketAddress = getContract({
+    const marketplaceAddress = getContract({
       name: contractNames.MARKETPLACE_ADAPTER
     }).address
 
@@ -176,17 +180,17 @@ export class NFTService
       id: `${VendorName.KNOWN_ORIGIN}-order-${edition.id}`,
       tokenId: edition.id,
       contractAddress,
-      marketAddress,
+      marketplaceAddress,
       owner: edition.artistAccount,
       buyer: null,
       price: price.toString(10),
       ethPrice: edition.priceInWei.toString(),
-      status: OrderStatus.OPEN,
+      status: ListingStatus.OPEN,
       createdAt: +edition.createdTimestamp,
       updatedAt: +edition.createdTimestamp,
       expiresAt: Infinity,
       network: Network.ETHEREUM,
-      chainId: Number(process.env.REACT_APP_CHAIN_ID)
+      chainId: Number(config.get('CHAIN_ID')!)
     }
   }
 

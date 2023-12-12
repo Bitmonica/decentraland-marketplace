@@ -12,16 +12,15 @@ type Count @entity {
   orderEstate: Int!
   orderWearable: Int!
   orderENS: Int!
-
   parcelTotal: Int!
-
   estateTotal: Int!
-
   wearableTotal: Int!
-
   ensTotal: Int!
-
   started: Int!
+  salesTotal: Int!
+  salesManaTotal: BigInt!
+  creatorEarningsManaTotal: BigInt!
+  daoEarningsManaTotal: BigInt!
 }
 
 # ---------------------------------------------------------
@@ -32,6 +31,7 @@ type Count @entity {
 # we need from each NFT type to the Order, in order to search for them, prefixing them with search_[nft]_[prop]
 type Order @entity {
   id: ID!
+  marketplaceAddress: Bytes!
   category: Category!
   nft: NFT
   nftAddress: Bytes!
@@ -53,6 +53,7 @@ type Order @entity {
 
 type Bid @entity {
   id: ID!
+  bidAddress: Bytes!
   category: Category!
   nft: NFT
   nftAddress: Bytes!
@@ -154,6 +155,11 @@ type NFT @entity {
 
   createdAt: BigInt!
   updatedAt: BigInt!
+  soldAt: BigInt
+
+  # analytics
+  sales: Int!
+  volume: BigInt!
 
   # search indexes
   searchOrderStatus: OrderStatus
@@ -187,7 +193,11 @@ type Account @entity {
   id: ID! # ETH addr
   address: Bytes!
   nfts: [NFT!] @derivedFrom(field: "owner")
-  mana: BigInt # Amount of mana owned
+  # analytics
+  sales: Int!
+  purchases: Int!
+  spent: BigInt!
+  earned: BigInt!
 }
 
 # ---------------------------------------------------------
@@ -223,6 +233,7 @@ enum WearableCategory @entity {
   mask
   tiara
   top_head
+  skin
 }
 
 enum WearableRarity @entity {
@@ -238,4 +249,40 @@ enum WearableRarity @entity {
 enum WearableBodyShape @entity {
   BaseFemale
   BaseMale
+}
+
+# ---------------------------------------------------------
+# Sales ---------------------------------------------------
+# ---------------------------------------------------------
+
+# We only track sales from Decentraland's smart contracts
+
+enum SaleType @entity {
+  bid
+  order
+}
+
+type Sale @entity {
+  id: ID!
+  type: SaleType!
+  buyer: Bytes!
+  seller: Bytes!
+  price: BigInt!
+  nft: NFT!
+  timestamp: BigInt!
+  txHash: Bytes!
+
+  # search
+  searchTokenId: BigInt!
+  searchContractAddress: Bytes!
+}
+
+# Data accumulated and condensed into day stats for all of the Marketplace activity
+type AnalyticsDayData @entity {
+  id: ID! # timestamp rounded to current day by dividing by 86400
+  date: Int!
+  sales: Int!
+  volume: BigInt!
+  creatorsEarnings: BigInt!
+  daoEarnings: BigInt!
 }

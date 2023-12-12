@@ -1,10 +1,11 @@
 import { action } from 'typesafe-actions'
+import { Order } from '@dcl/schemas'
 import { buildTransactionPayload } from 'decentraland-dapps/dist/modules/transaction/utils'
+import { ErrorCode } from 'decentraland-transactions'
 
 import { NFT } from '../nft/types'
-import { Order } from './types'
-import { getNFTName } from '../nft/utils'
-import { formatMANA } from '../../lib/mana'
+import { getAssetName } from '../asset/utils'
+import { formatWeiMANA } from '../../lib/mana'
 
 // Create Order (aka Sell)
 
@@ -31,7 +32,7 @@ export const createOrderSuccess = (
       tokenId: nft.tokenId,
       contractAddress: nft.contractAddress,
       network: nft.network,
-      name: getNFTName(nft),
+      name: getAssetName(nft),
       price
     })
   })
@@ -39,8 +40,9 @@ export const createOrderFailure = (
   nft: NFT,
   price: number,
   expiresAt: number,
-  error: string
-) => action(CREATE_ORDER_FAILURE, { nft, price, expiresAt, error })
+  error: string,
+  errorCode?: ErrorCode
+) => action(CREATE_ORDER_FAILURE, { nft, price, expiresAt, error, errorCode })
 
 export type CreateOrderRequestAction = ReturnType<typeof createOrderRequest>
 export type CreateOrderSuccessAction = ReturnType<typeof createOrderSuccess>
@@ -65,12 +67,16 @@ export const executeOrderSuccess = (order: Order, nft: NFT, txHash: string) =>
       tokenId: nft.tokenId,
       contractAddress: nft.contractAddress,
       network: nft.network,
-      name: getNFTName(nft),
-      price: formatMANA(order.price)
+      name: getAssetName(nft),
+      price: formatWeiMANA(order.price)
     })
   })
-export const executeOrderFailure = (order: Order, nft: NFT, error: string) =>
-  action(EXECUTE_ORDER_FAILURE, { order, nft, error })
+export const executeOrderFailure = (
+  order: Order,
+  nft: NFT,
+  error: string,
+  errorCode?: ErrorCode
+) => action(EXECUTE_ORDER_FAILURE, { order, nft, error, errorCode })
 
 export type ExecuteOrderRequestAction = ReturnType<typeof executeOrderRequest>
 export type ExecuteOrderSuccessAction = ReturnType<typeof executeOrderSuccess>
@@ -92,12 +98,16 @@ export const cancelOrderSuccess = (order: Order, nft: NFT, txHash: string) =>
       tokenId: nft.tokenId,
       contractAddress: nft.contractAddress,
       network: nft.network,
-      name: getNFTName(nft),
-      price: formatMANA(order.price)
+      name: getAssetName(nft),
+      price: formatWeiMANA(order.price)
     })
   })
-export const cancelOrderFailure = (order: Order, nft: NFT, error: string) =>
-  action(CANCEL_ORDER_FAILURE, { order, nft, error })
+export const cancelOrderFailure = (
+  order: Order,
+  nft: NFT,
+  error: string,
+  errorCode?: ErrorCode
+) => action(CANCEL_ORDER_FAILURE, { order, nft, error, errorCode })
 
 export type CancelOrderRequestAction = ReturnType<typeof cancelOrderRequest>
 export type CancelOrderSuccessAction = ReturnType<typeof cancelOrderSuccess>

@@ -1,9 +1,8 @@
 import { action } from 'typesafe-actions'
-import { ChainId } from '@dcl/schemas'
+import { Bid, ChainId } from '@dcl/schemas'
 import { buildTransactionPayload } from 'decentraland-dapps/dist/modules/transaction/utils'
 import { NFT } from '../nft/types'
-import { Bid } from './types'
-import { formatMANA } from '../../lib/mana'
+import { formatWeiMANA } from '../../lib/mana'
 
 // Place Bid
 export const PLACE_BID_REQUEST = '[Request] Place Bid'
@@ -73,13 +72,13 @@ export const ACCEPT_BID_FAILURE = '[Failure] Accept Bid'
 
 export const acceptBidRequest = (bid: Bid) =>
   action(ACCEPT_BID_REQUEST, { bid })
-export const acceptBidSuccess = (bid: Bid, chainId: ChainId, txHash: string) =>
+export const acceptBidSuccess = (bid: Bid, txHash: string) =>
   action(ACCEPT_BID_SUCCESS, {
     bid,
-    ...buildTransactionPayload(chainId, txHash, {
+    ...buildTransactionPayload(bid.chainId, txHash, {
       tokenId: bid.tokenId,
       contractAddress: bid.contractAddress,
-      price: formatMANA(bid.price)
+      price: formatWeiMANA(bid.price)
     })
   })
 export const acceptBidFailure = (bid: Bid, error: string) =>
@@ -96,13 +95,13 @@ export const CANCEL_BID_FAILURE = '[Failure] Cancel Bid'
 
 export const cancelBidRequest = (bid: Bid) =>
   action(CANCEL_BID_REQUEST, { bid })
-export const cancelBidSuccess = (bid: Bid, chainId: ChainId, txHash: string) =>
+export const cancelBidSuccess = (bid: Bid, txHash: string) =>
   action(CANCEL_BID_SUCCESS, {
     bid,
-    ...buildTransactionPayload(chainId, txHash, {
+    ...buildTransactionPayload(bid.chainId, txHash, {
       tokenId: bid.tokenId,
       contractAddress: bid.contractAddress,
-      price: formatMANA(bid.price)
+      price: formatWeiMANA(bid.price)
     })
   })
 export const cancelBidFailure = (bid: Bid, error: string) =>

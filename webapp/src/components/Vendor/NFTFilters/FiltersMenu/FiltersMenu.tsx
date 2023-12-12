@@ -1,12 +1,22 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
+import classNames from 'classnames'
+import { Network, NFTCategory, Rarity } from '@dcl/schemas'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
-import { Row } from 'decentraland-ui'
+import {
+  Row,
+  Column,
+  SmartIcon,
+  Popup,
+  Mobile,
+  NotMobile,
+  Header,
+  Radio
+} from 'decentraland-ui'
 import { WearableGender } from '../../../../modules/nft/wearable/types'
+import { contracts } from '../../../../modules/contract/utils'
 import { ArrayFilter } from '../ArrayFilter'
 import { SelectFilter } from '../SelectFilter'
 import { Props } from './FiltersMenu.types'
-import { Network, NFTCategory, Rarity } from '@dcl/schemas'
-import { contracts } from '../../../../modules/contract/utils'
 
 export const ALL_FILTER_OPTION = 'ALL'
 
@@ -16,10 +26,12 @@ const FiltersMenu = (props: Props) => {
     selectedRarities,
     selectedGenders,
     selectedNetwork,
+    isOnlySmart,
     onCollectionsChange,
     onRaritiesChange,
     onGendersChange,
-    onNetworkChange
+    onNetworkChange,
+    onOnlySmartChange
   } = props
 
   const collectionOptions = useMemo(() => {
@@ -43,7 +55,7 @@ const FiltersMenu = (props: Props) => {
       .reverse() as string[]
     return options.map(rarity => ({
       value: rarity,
-      text: t(`wearable.rarity.${rarity}`)
+      text: t(`rarity.${rarity}`)
     }))
   }, [])
 
@@ -51,7 +63,7 @@ const FiltersMenu = (props: Props) => {
     const options = Object.values(WearableGender)
     return options.map(gender => ({
       value: gender,
-      text: t(`wearable.body_shape.${gender}`)
+      text: t(`body_shape.${gender}`)
     }))
   }, [])
 
@@ -71,35 +83,71 @@ const FiltersMenu = (props: Props) => {
     ]
   }, [])
 
+  const handleOnlySmartClick = useCallback(
+    () => onOnlySmartChange(!isOnlySmart),
+    [onOnlySmartChange, isOnlySmart]
+  )
+
   return (
     <>
       <Row>
         <SelectFilter
           name={t('nft_filters.collection')}
           value={selectedCollection || ALL_FILTER_OPTION}
+          clearable={!!selectedCollection}
           options={collectionOptions}
           onChange={onCollectionsChange}
         />
         <SelectFilter
           name={t('nft_filters.network')}
           value={selectedNetwork || ALL_FILTER_OPTION}
+          clearable={!!selectedNetwork}
           options={networkOptions}
           onChange={network => onNetworkChange(network as Network)}
         />
+        <Mobile>
+          <Header sub>{t('nft_filters.smart_wearables')}</Header>
+          <Radio
+            className="smart-toggle-mobile"
+            toggle
+            checked={isOnlySmart}
+            onChange={handleOnlySmartClick}
+          />
+        </Mobile>
+        <NotMobile>
+          <Popup
+            content={t('nft_filters.smart_wearables')}
+            position="top center"
+            trigger={
+              <div
+                className={classNames(`smart-toggle`, {
+                  'is-enabled': isOnlySmart
+                })}
+                onClick={handleOnlySmartClick}
+              >
+                <SmartIcon />
+              </div>
+            }
+          ></Popup>
+        </NotMobile>
       </Row>
       <Row>
-        <ArrayFilter
-          name={t('nft_filters.rarity')}
-          values={selectedRarities}
-          options={rarityOptions}
-          onChange={onRaritiesChange}
-        />
-        <ArrayFilter
-          name={t('nft_filters.gender')}
-          values={selectedGenders}
-          options={genderOptions}
-          onChange={onGendersChange}
-        />
+        <Column>
+          <ArrayFilter
+            name={t('nft_filters.rarity')}
+            values={selectedRarities}
+            options={rarityOptions}
+            onChange={onRaritiesChange}
+          />
+        </Column>
+        <Column>
+          <ArrayFilter
+            name={t('nft_filters.gender')}
+            values={selectedGenders}
+            options={genderOptions}
+            onChange={onGendersChange}
+          />
+        </Column>
       </Row>
     </>
   )

@@ -46,6 +46,14 @@ import {
   ArchiveBidAction,
   UnarchiveBidAction
 } from '../bid/actions'
+import {
+  BuyItemSuccessAction,
+  BUY_ITEM_SUCCESS,
+  FetchItemsSuccessAction,
+  FETCH_ITEMS_SUCCESS
+} from '../item/actions'
+import { SetIsTryingOnAction, SET_IS_TRYING_ON } from '../ui/preview/actions'
+import { fromWei } from 'web3x/utils'
 
 function track<T extends PayloadAction<string, any>>(
   actionType: string,
@@ -174,5 +182,32 @@ track<FetchNFTsSuccessAction>(
     view: payload.options.view,
     vendor: payload.options.vendor,
     count: payload.count
+  })
+)
+
+track<FetchItemsSuccessAction>(
+  FETCH_ITEMS_SUCCESS,
+  'Fetch Items',
+  ({ payload }) => ({
+    options: payload.options,
+    total: payload.total
+  })
+)
+
+track<BuyItemSuccessAction>(BUY_ITEM_SUCCESS, 'Buy Item', ({ payload }) => ({
+  itemId: payload.item.itemId,
+  contractAddress: payload.item.contractAddress,
+  rarity: payload.item.rarity,
+  network: payload.item.network,
+  chainId: payload.item.chainId,
+  price: Number(fromWei(payload.item.price, 'ether')),
+  data: payload.item.data
+}))
+
+track<SetIsTryingOnAction>(
+  SET_IS_TRYING_ON,
+  'Toggle Preview Mode',
+  ({ payload }) => ({
+    mode: payload.value ? 'avatar' : 'wearable'
   })
 )

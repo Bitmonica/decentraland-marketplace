@@ -4,7 +4,7 @@
 }
 
 .ArrayFilter .options .option {
-  padding: 5px 12px;
+  padding: 5px 10px;
   background-color: #37333d;
   border-radius: 16px;
   text-transform: uppercase;
@@ -12,6 +12,10 @@
   cursor: pointer;
   margin-right: 8px;
   margin-bottom: 8px;
+}
+
+.ArrayFilter .options .option:last-child {
+  margin-right: 0px;
 }
 
 .ArrayFilter .options .option.selected {

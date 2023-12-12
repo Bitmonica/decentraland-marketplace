@@ -1,16 +1,15 @@
 # Blockchain indexer
 
+- Mainnet: https://thegraph.com/hosted-service/subgraph/decentraland/marketplace (QmapfJhM9m3Jguo2xQwMsrCQANpurunQSAv5U9a2TwEVLb)
+- Ropsten: https://thegraph.com/hosted-service/subgraph/decentraland/marketplace-ropsten (QmY9m5dzbQDwWyn5wQig5MwufkTw7rb9QbnthBiqprZ5ZD)
+
 It uses [thegraph](https://thegraph.com)
 
-**Run**
+**Deploy**
 
 ```bash
-npm run build-data -- --network mainnet
-
 npm run codegen
-npm run build
-
-npm run deploy -- --network mainnet
+npm run deploy:ropsten # or deploy:mainnet
 ```
 
 If a new collection in Ethereum is added you will need to add it as following

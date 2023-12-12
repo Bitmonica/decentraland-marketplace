@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Address } from 'web3x-es/address'
+import { Address } from 'web3x/address'
 import { Row, Section, Header } from 'decentraland-ui'
 import { Profile } from 'decentraland-dapps/dist/containers'
 import { t } from 'decentraland-dapps/dist/modules/translation/utils'
@@ -30,7 +30,7 @@ export default class Popup extends React.PureComponent<Props> {
         </Section>
 
         <Section className="owner">
-          <Header sub>{t('nft_page.owner')}</Header>
+          <Header sub>{t('asset_page.owner')}</Header>
           <Profile
             address={tile.owner || Address.ZERO.toString()}
             debounce={500}
@@ -39,7 +39,7 @@ export default class Popup extends React.PureComponent<Props> {
 
         {tile.price ? (
           <Section className="price">
-            <Header sub>{t('nft_page.price')}</Header>
+            <Header sub>{t('asset_page.price')}</Header>
             <Mana>{tile.price.toLocaleString()}</Mana>
           </Section>
         ) : null}

@@ -1,25 +1,22 @@
 import React from 'react'
 
-import { VendorName } from '../../../modules/vendor/types'
-import { ENSDetail } from '../../NFTPage/ENSDetail'
-import { EstateDetail } from '../../NFTPage/EstateDetail'
-import { ParcelDetail } from '../../NFTPage/ParcelDetail'
-import { PictureFrameDetail } from '../../NFTPage/PictureFrameDetail'
-import { WearableDetail } from '../../NFTPage/WearableDetail'
+import { ENSDetail } from '../../AssetPage/ENSDetail'
+import { EstateDetail } from '../../AssetPage/EstateDetail'
+import { ParcelDetail } from '../../AssetPage/ParcelDetail'
+import { WearableDetail } from '../../AssetPage/WearableDetail'
+import { EmoteDetail } from '../../AssetPage/EmoteDetail'
 import { Props } from './NFTDetail.types'
 
 const NFTDetail = (props: Props) => {
   const { nft } = props
-  const { parcel, estate, wearable, ens } = nft.data as any
+  const { parcel, estate, wearable, emote, ens } = nft.data as any
   return (
     <>
       {parcel ? <ParcelDetail nft={nft} /> : null}
       {estate ? <EstateDetail nft={nft} /> : null}
       {wearable ? <WearableDetail nft={nft} /> : null}
+      {emote ? <EmoteDetail nft={nft} /> : null}
       {ens ? <ENSDetail nft={nft} /> : null}
-      {nft.vendor !== VendorName.DECENTRALAND ? (
-        <PictureFrameDetail nft={nft} />
-      ) : null}
     </>
   )
 }

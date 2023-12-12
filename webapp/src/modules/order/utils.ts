@@ -1,7 +1,7 @@
+import { Order } from '@dcl/schemas'
 import addDays from 'date-fns/addDays'
 import dateFnsFormat from 'date-fns/format'
-import { NFT } from '../nft/types'
-import { Order } from './types'
+import { Asset } from '../asset/types'
 
 export const DEFAULT_EXPIRATION_IN_DAYS = 30
 export const INPUT_FORMAT = 'yyyy-MM-dd'
@@ -15,9 +15,17 @@ export function isExpired(expiresAt: string) {
   return parseInt(expiresAt, 10) < Date.now()
 }
 
-export function getActiveOrder(nft: NFT | null, orders: Record<string, Order>) {
-  if (!!nft && !!nft.activeOrderId && nft.activeOrderId in orders) {
-    return orders[nft.activeOrderId]
+export function getActiveOrder(
+  asset: Asset | null,
+  orders: Record<string, Order>
+) {
+  if (
+    asset &&
+    'activeOrderId' in asset &&
+    !!asset.activeOrderId &&
+    asset.activeOrderId in orders
+  ) {
+    return orders[asset.activeOrderId]
   }
   return null
 }

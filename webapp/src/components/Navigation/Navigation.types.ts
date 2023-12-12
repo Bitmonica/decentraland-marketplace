@@ -1,9 +1,8 @@
 export enum NavigationTab {
+  LANDS = 'lands',
   BROWSE = 'browse',
-  PARTNERS = 'partners',
-  PARTNER = 'partner',
-  MY_ASSETS = 'my_assets',
-  MY_BIDS = 'my_bids',
+  COLLECTIBLES = 'collectibles',
+  MY_STORE = 'my_store',
   ACTIVITY = 'activity'
 }
 

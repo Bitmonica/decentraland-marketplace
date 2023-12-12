@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { toBN } from 'web3x-es/utils'
+import { config } from '../../config'
 
 export class MarketplacePrice {
   public oneMillion: BN
@@ -8,11 +8,10 @@ export class MarketplacePrice {
   public maxPriceIncreasePercentage: number
 
   constructor() {
-    const feePerMillion =
-      process.env.REACT_APP_MARKETPLACE_ADAPTER_FEE_PER_MILLION
+    const feePerMillion = config.get('MARKETPLACE_ADAPTER_FEE_PER_MILLION')
 
     const maxPriceIncreasePercentage = Number(
-      process.env.REACT_APP_MAX_PRICE_INCREASE_PERCENTAGE
+      config.get('MAX_PRICE_INCREASE_PERCENTAGE')
     )
 
     if (!feePerMillion) {
@@ -25,14 +24,14 @@ export class MarketplacePrice {
       )
     }
 
-    this.feePerMillion = toBN(feePerMillion)
-    this.oneMillion = toBN('1000000')
+    this.feePerMillion = new BN(feePerMillion)
+    this.oneMillion = new BN('1000000')
 
     this.maxPriceIncreasePercentage = maxPriceIncreasePercentage
   }
 
   addFee(manaWeiAmount: string | number) {
-    const bnAmount = toBN(manaWeiAmount.toString())
+    const bnAmount = new BN(manaWeiAmount.toString())
 
     return bnAmount
       .add(bnAmount.mul(this.feePerMillion).div(this.oneMillion))
@@ -40,9 +39,7 @@ export class MarketplacePrice {
   }
 
   addMaxSlippage(manaWeiAmount: string | number) {
-    return toBN(manaWeiAmount)
-      .mul(toBN(110))
-      .divRound(toBN(100)) // 10 percent increase
+    return new BN(manaWeiAmount).mul(new BN(110)).divRound(new BN(100)) // 10 percent increase
   }
 
   getPercentageIncrease(computedPrice: string, price: string) {
@@ -50,9 +47,9 @@ export class MarketplacePrice {
       return 0
     }
 
-    const percentage = toBN(computedPrice)
-      .mul(toBN(100))
-      .divRound(toBN(price))
+    const percentage = new BN(computedPrice)
+      .mul(new BN(100))
+      .divRound(new BN(price))
       .toNumber()
 
     return percentage <= 100 ? 0 : percentage - 100

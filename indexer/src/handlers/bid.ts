@@ -2,13 +2,15 @@ import { BigInt, Address } from '@graphprotocol/graph-ts'
 import {
   BidCreated,
   BidAccepted,
-  BidCancelled
+  BidCancelled,
+  ERC721Bid,
 } from '../entities/ERC721Bid/ERC721Bid'
 import { Bid, NFT } from '../entities/schema'
 import { getNFTId } from '../modules/nft'
 import { getBidId } from '../modules/bid'
 import { getCategory } from '../modules/category'
 import * as status from '../modules/order/status'
+import { BID_SALE_TYPE, trackSale } from '../modules/analytics'
 
 export function handleBidCreated(event: BidCreated): void {
   let category = getCategory(event.params._tokenAddress.toHexString())
@@ -27,6 +29,7 @@ export function handleBidCreated(event: BidCreated): void {
   let bid = new Bid(id)
 
   if (nft != null) {
+    bid.bidAddress = event.address
     bid.status = status.OPEN
     bid.category = category
     bid.nftAddress = event.params._tokenAddress
@@ -74,6 +77,18 @@ export function handleBidAccepted(event: BidAccepted): void {
 
   nft.updatedAt = event.block.timestamp
   nft.save()
+
+  let bidContract = ERC721Bid.bind(event.address)
+  trackSale(
+    BID_SALE_TYPE,
+    event.params._bidder,
+    event.params._seller,
+    nft.id,
+    bid.price,
+    bidContract.ownerCutPerMillion(),
+    event.block.timestamp,
+    event.transaction.hash
+  )
 }
 
 export function handleBidCancelled(event: BidCancelled): void {

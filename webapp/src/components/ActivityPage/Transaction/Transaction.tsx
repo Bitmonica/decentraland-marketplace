@@ -4,16 +4,18 @@ import { T, t } from 'decentraland-dapps/dist/modules/translation/utils'
 import { TransactionLink, Profile } from 'decentraland-dapps/dist/containers'
 import {
   GrantTokenSuccessAction,
+  RevokeTokenSuccessAction,
   GRANT_TOKEN_SUCCESS,
   REVOKE_TOKEN_SUCCESS
 } from 'decentraland-dapps/dist/modules/authorization/actions'
 
-import { getNFTName } from '../../../modules/nft/utils'
+import { getAssetName } from '../../../modules/asset/utils'
 import {
   CREATE_ORDER_SUCCESS,
   CANCEL_ORDER_SUCCESS,
   EXECUTE_ORDER_SUCCESS
 } from '../../../modules/order/actions'
+import { BUY_ITEM_SUCCESS } from '../../../modules/item/actions'
 import { TRANSFER_NFT_SUCCESS } from '../../../modules/nft/actions'
 import {
   PLACE_BID_SUCCESS,
@@ -22,7 +24,8 @@ import {
 } from '../../../modules/bid/actions'
 import { locations } from '../../../modules/routing/locations'
 import { getContract } from '../../../modules/contract/utils'
-import { NFTProvider } from '../../NFTProvider'
+import { AssetType } from '../../../modules/asset/types'
+import { AssetProvider } from '../../AssetProvider'
 import { Mana } from '../../Mana'
 import { TransactionDetail } from './TransactionDetail'
 import { Props } from './Transaction.types'
@@ -30,64 +33,33 @@ import { Props } from './Transaction.types'
 const Transaction = (props: Props) => {
   const { tx } = props
   switch (tx.actionType) {
-    case GRANT_TOKEN_SUCCESS: {
-      const { authorization } = tx.payload as GrantTokenSuccessAction['payload']
-      const authorized = getContract({
-        address: authorization.authorizedAddress
-      })
-      const contract = getContract({ address: authorization.contractAddress })
-      return (
-        <TransactionDetail
-          text={
-            <T
-              id="transaction.detail.approve_token"
-              values={{
-                action: t('transaction.action.approved'),
-                contract: (
-                  <TransactionLink
-                    chainId={authorization.chainId}
-                    address={authorized.address}
-                    txHash=""
-                  >
-                    {authorized.name}
-                  </TransactionLink>
-                ),
-                token: (
-                  <TransactionLink
-                    chainId={authorization.chainId}
-                    address={contract.address}
-                    txHash=""
-                  >
-                    {contract.name}
-                  </TransactionLink>
-                )
-              }}
-            />
-          }
-          tx={tx}
-        />
-      )
-    }
+    case GRANT_TOKEN_SUCCESS:
     case REVOKE_TOKEN_SUCCESS: {
-      const { authorization } = tx.payload as GrantTokenSuccessAction['payload']
+      const { authorization } = tx.payload as
+        | GrantTokenSuccessAction['payload']
+        | RevokeTokenSuccessAction['payload']
       const authorized = getContract({
         address: authorization.authorizedAddress
       })
       const contract = getContract({ address: authorization.contractAddress })
+      const action =
+        tx.actionType === GRANT_TOKEN_SUCCESS
+          ? t('transaction.action.approved')
+          : t('transaction.action.unapproved')
       return (
         <TransactionDetail
           text={
             <T
               id="transaction.detail.approve_token"
               values={{
-                action: t('transaction.action.not_approved'),
+                action,
                 contract: (
                   <TransactionLink
                     chainId={authorization.chainId}
                     address={authorized.address}
                     txHash=""
                   >
-                    {authorized.name}
+                    {authorized.label || authorized.name}
                   </TransactionLink>
                 ),
                 token: (
@@ -96,7 +68,7 @@ const Transaction = (props: Props) => {
                     address={contract.address}
                     txHash=""
                   >
-                    {contract.name}
+                    {contract.label || contract.name}
                   </TransactionLink>
                 )
               }}
@@ -109,10 +81,14 @@ const Transaction = (props: Props) => {
     case CREATE_ORDER_SUCCESS: {
       const { tokenId, contractAddress, network, name, price } = tx.payload
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.create_order"
@@ -133,16 +109,20 @@ const Transaction = (props: Props) => {
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     case CANCEL_ORDER_SUCCESS: {
       const { tokenId, contractAddress, network, name, price } = tx.payload
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.cancel_order"
@@ -163,25 +143,47 @@ const Transaction = (props: Props) => {
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
+    case BUY_ITEM_SUCCESS:
     case EXECUTE_ORDER_SUCCESS: {
-      const { tokenId, contractAddress, network, name, price } = tx.payload
+      const {
+        tokenId,
+        itemId,
+        contractAddress,
+        network,
+        name,
+        price
+      } = tx.payload
+
+      let assetTokenId: string
+      let type: AssetType
+      let url: string
+      if (itemId) {
+        type = AssetType.ITEM
+        assetTokenId = itemId
+        url = locations.item(contractAddress, assetTokenId)
+      } else {
+        type = AssetType.NFT
+        assetTokenId = tokenId
+        url = locations.nft(contractAddress, assetTokenId)
+      }
+
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
-          {nft => (
+        <AssetProvider
+          type={type}
+          contractAddress={contractAddress}
+          tokenId={assetTokenId}
+        >
+          {asset => (
             <TransactionDetail
-              nft={nft}
+              asset={asset}
               text={
                 <T
                   id="transaction.detail.execute_order"
                   values={{
-                    name: (
-                      <Link to={locations.nft(contractAddress, tokenId)}>
-                        {name}
-                      </Link>
-                    ),
+                    name: <Link to={url}>{name}</Link>,
                     price: (
                       <Mana network={network} inline>
                         {price.toLocaleString()}
@@ -193,16 +195,20 @@ const Transaction = (props: Props) => {
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     case TRANSFER_NFT_SUCCESS: {
       const { tokenId, contractAddress, name, address } = tx.payload
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.transfer"
@@ -223,86 +229,110 @@ const Transaction = (props: Props) => {
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     case PLACE_BID_SUCCESS: {
       const { tokenId, contractAddress, price } = tx.payload
 
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.place_bid"
                   values={{
                     name: (
                       <Link to={locations.nft(contractAddress, tokenId)}>
-                        {nft ? getNFTName(nft) : ''}
+                        {nft ? getAssetName(nft) : ''}
                       </Link>
                     ),
-                    price: <Mana inline>{price.toLocaleString()}</Mana>
+                    price: (
+                      <Mana network={nft?.network} inline>
+                        {price.toLocaleString()}
+                      </Mana>
+                    )
                   }}
                 />
               }
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     case ACCEPT_BID_SUCCESS: {
       const { tokenId, contractAddress, price } = tx.payload
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.accept_bid"
                   values={{
                     name: (
                       <Link to={locations.nft(contractAddress, tokenId)}>
-                        {nft ? getNFTName(nft) : ''}
+                        {nft ? getAssetName(nft) : ''}
                       </Link>
                     ),
-                    price: <Mana inline>{price.toLocaleString()}</Mana>
+                    price: (
+                      <Mana inline network={nft?.network}>
+                        {price.toLocaleString()}
+                      </Mana>
+                    )
                   }}
                 />
               }
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     case CANCEL_BID_SUCCESS: {
       const { tokenId, contractAddress, price } = tx.payload
       return (
-        <NFTProvider contractAddress={contractAddress} tokenId={tokenId}>
+        <AssetProvider
+          type={AssetType.NFT}
+          contractAddress={contractAddress}
+          tokenId={tokenId}
+        >
           {nft => (
             <TransactionDetail
-              nft={nft}
+              asset={nft}
               text={
                 <T
                   id="transaction.detail.cancel_bid"
                   values={{
                     name: (
                       <Link to={locations.nft(contractAddress, tokenId)}>
-                        {nft ? getNFTName(nft) : ''}
+                        {nft ? getAssetName(nft) : ''}
                       </Link>
                     ),
-                    price: <Mana inline>{price.toLocaleString()}</Mana>
+                    price: (
+                      <Mana inline network={nft?.network}>
+                        {price.toLocaleString()}
+                      </Mana>
+                    )
                   }}
                 />
               }
               tx={tx}
             />
           )}
-        </NFTProvider>
+        </AssetProvider>
       )
     }
     default:

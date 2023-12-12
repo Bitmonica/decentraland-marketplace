@@ -1,51 +1,56 @@
 import { NFTCategory } from '@dcl/schemas'
-import { getSearchCategory, getSearchWearableCategory } from '../routing/search'
-import { SearchOptions } from '../routing/types'
-import { Section } from './routing/types'
+import {
+  getCategoryFromSection,
+  getSearchWearableCategory
+} from '../routing/search'
+import { BrowseOptions } from '../routing/types'
+import { Sections } from './routing/types'
 import { NFTsFetchFilters } from './nft/types'
 import { VendorName, Disabled } from './types'
 
 export function getFilters(
   vendor: VendorName,
-  searchOptions: SearchOptions
+  options: BrowseOptions
 ): NFTsFetchFilters {
-  const { section } = searchOptions
+  const { section } = options
 
   switch (vendor) {
     case VendorName.DECENTRALAND: {
-      const currentSection = Section[VendorName.DECENTRALAND]
+      const currentSection = Sections[VendorName.DECENTRALAND]
 
       const isLand = section === currentSection.LAND
       const isWearableHead = section === currentSection.WEARABLES_HEAD
       const isWearableAccessory =
-        section === currentSection.WEARABLES_ACCESORIES
+        section === currentSection.WEARABLES_ACCESSORIES
 
-      const category = getSearchCategory(section!)
+      const category = getCategoryFromSection(section!)
       const wearableCategory =
         !isWearableAccessory && category === NFTCategory.WEARABLE
           ? getSearchWearableCategory(section!)
           : undefined
 
       const {
-        wearableRarities,
+        rarities,
         wearableGenders,
         contracts,
-        network
-      } = searchOptions
+        network,
+        onlySmart
+      } = options
 
       return {
         isLand,
         isWearableHead,
         isWearableAccessory,
+        isWearableSmart: onlySmart,
         wearableCategory,
-        wearableRarities,
+        rarities,
         wearableGenders,
         contracts,
         network
       } as NFTsFetchFilters<VendorName.DECENTRALAND>
     }
     case VendorName.KNOWN_ORIGIN: {
-      const currentSection = Section[VendorName.KNOWN_ORIGIN]
+      const currentSection = Sections[VendorName.KNOWN_ORIGIN]
 
       return {
         isEdition: section === currentSection.EDITIONS,

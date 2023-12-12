@@ -46,7 +46,7 @@
   margin-top: -8px;
 }
 
-.NFTBrowse .filters .Filter + .Filter {
+.AssetBrowse .filters .Filter + .Filter {
   margin-top: 14px;
 }
 
@@ -60,13 +60,18 @@
 
 .NFTFilters .filters .dcl.row .Filter {
   flex: 1 0 auto;
+  margin-left: auto;
+}
+
+.NFTFilters .filters .dcl.row .dcl.column:first-child .Filter {
+  margin-left: 0px;
 }
 
 .NFTFilters .filters .dcl.row .Filter + .Filter {
   margin-top: 0px;
   flex: none;
   width: 50%;
-  margin-left: 24px;
+  margin-left: 20px;
 }
 
 .NFTFilters .ui.toggle.checkbox input.hidden:focus + label,
@@ -98,7 +103,6 @@
 
 .NFTFilters .filters .ui.dropdown .visible.menu {
   max-height: 500px;
-  overflow: auto;
 }
 
 .NFTFilters .open-filters-wrapper {
@@ -135,6 +139,14 @@
 
 .NFTFilters .Chip.atlas {
   border-radius: 0 4px 4px 0;
+}
+
+.NFTFilters .clear-filters {
+  font-size: 12px;
+  line-height: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--primary);
 }
 
 /*------------------
@@ -192,7 +204,6 @@
 
 .FiltersModal .ui.dropdown .visible.menu {
   max-height: 500px;
-  overflow: auto;
 }
 
 .FiltersModal .ui.dropdown .text {
@@ -202,6 +213,26 @@
 
 .FiltersModal .ui.dropdown .dropdown.icon {
   color: var(--text);
+}
+
+.FiltersModal .clear-filters-modal > span {
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.NFTFilters .smart-toggle {
+  background: #37333d;
+  padding: 8px;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  margin-left: 20px;
+  margin-top: 27px;
+  cursor: pointer;
+}
+
+.NFTFilters .smart-toggle.is-enabled {
+  background: var(--primary);
 }
 
 @media (max-width: 768px) {
@@ -214,4 +245,15 @@
     flex-direction: column;
     justify-content: stretch;
   }
+
+  .FiltersModal .smart-toggle-mobile {
+    margin-top: 12px;
+    margin-left: 0px;
+    margin-bottom: 20px;
+  }
+}
+
+/* SelectFields */
+.NFTFilters .dcl.select-field .ui.sub.header {
+  font-weight: 600;
 }

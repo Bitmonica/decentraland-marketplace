@@ -1,12 +1,11 @@
 import BN from 'bn.js'
-import { Address } from 'web3x-es/address'
-import { toBN, toWei } from 'web3x-es/utils'
-import { Network } from '@dcl/schemas'
+import { Address } from 'web3x/address'
+import { toWei } from 'web3x/utils'
+import { ListingStatus, Network, Order } from '@dcl/schemas'
 import { Wallet } from 'decentraland-dapps/dist/modules/wallet/types'
 import { ERC721 } from '../../../contracts/ERC721'
 import { ContractFactory } from '../../contract/ContractFactory'
 import { NFT, NFTsFetchParams, NFTsCountParams } from '../../nft/types'
-import { Order, OrderStatus } from '../../order/types'
 import { Account } from '../../account/types'
 import { getNFTId } from '../../nft/utils'
 import { TokenConverter } from '../TokenConverter'
@@ -16,6 +15,7 @@ import { VendorName, TransferType } from '../types'
 import { ContractService } from './ContractService'
 import { SuperRareAsset, SuperRareOrder, SuperRareOwner } from './types'
 import { superRareAPI, MAX_QUERY_SIZE } from './api'
+import { config } from '../../../config'
 
 export class NFTService implements NFTServiceInterface<VendorName.SUPER_RARE> {
   private tokenConverter: TokenConverter
@@ -160,36 +160,40 @@ export class NFTService implements NFTServiceInterface<VendorName.SUPER_RARE> {
       },
       category: 'art',
       vendor: VendorName.SUPER_RARE,
-      chainId: Number(process.env.REACT_APP_CHAIN_ID),
+      chainId: Number(config.get('CHAIN_ID')!),
       network: Network.ETHEREUM,
       issuedId: null,
       itemId: null,
       createdAt: 0,
-      updatedAt: 0
+      updatedAt: 0,
+      soldAt: 0
     }
   }
 
-  toOrder(order: SuperRareOrder, oneEthInMANA: string): Order {
+  toOrder(
+    order: SuperRareOrder,
+    oneEthInMANA: string
+  ): Order & { ethPrice: string } {
     const { asset, taker } = order
 
     const totalWei = this.marketplacePrice.addFee(order.amountWithFee)
-    const weiPrice = toBN(totalWei).mul(toBN(oneEthInMANA))
+    const weiPrice = new BN(totalWei).mul(new BN(oneEthInMANA))
     const price = weiPrice.div(this.oneEthInWei)
 
     return {
       id: `${VendorName.SUPER_RARE}-order-${asset.id}`,
       tokenId: asset.id.toString(),
       contractAddress: asset.contractAddress,
-      marketAddress: order.marketContractAddress,
+      marketplaceAddress: order.marketContractAddress,
       owner: asset.owner.address,
       buyer: taker ? taker.address : null,
       price: price.toString(10),
       ethPrice: order.amountWithFee.toString(),
-      status: OrderStatus.OPEN,
+      status: ListingStatus.OPEN,
       createdAt: +order.timestamp,
       updatedAt: +order.timestamp,
       expiresAt: Infinity,
-      chainId: Number(process.env.REACT_APP_CHAIN_ID),
+      chainId: Number(config.get('CHAIN_ID')!),
       network: Network.ETHEREUM
     }
   }

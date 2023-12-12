@@ -7,13 +7,16 @@ import {
 import { Network as AppNetwork } from '../../contract/types'
 import { TransferType } from '../types'
 import { nftAPI } from './nft'
+import { config } from '../../../config'
 
-const network = process.env.REACT_APP_NETWORK! as AppNetwork
+const network = config.get('NETWORK')! as AppNetwork
 
 export enum ContractName {
   MANA = 'MANA',
   MARKETPLACE = 'Marketplace',
-  BIDS = 'Bids'
+  LEGACY_MARKETPLACE = 'LegacyMarketplace',
+  BIDS = 'Bids',
+  COLLECTION_STORE = 'CollectionStore'
 }
 
 const contracts = ({
@@ -52,7 +55,33 @@ const contracts = ({
     },
     {
       name: ContractName.MARKETPLACE,
+      address: getContract(CN.MarketplaceV2, ChainId.MATIC_MUMBAI).address,
+      label: 'MarketplaceV2',
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MUMBAI
+    },
+    {
+      name: ContractName.LEGACY_MARKETPLACE,
       address: getContract(CN.Marketplace, ChainId.MATIC_MUMBAI).address,
+      label: 'MarketplaceV1',
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MUMBAI
+    },
+    {
+      name: CN.CollectionStore,
+      address: getContract(CN.CollectionStore, ChainId.MATIC_MUMBAI).address,
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MUMBAI
+    },
+    {
+      name: ContractName.BIDS,
+      address: getContract(CN.BidV2, ChainId.MATIC_MUMBAI).address,
       vendor: 'decentraland',
       category: null,
       network: Network.MATIC,
@@ -82,7 +111,7 @@ const contracts = ({
       vendor: 'decentraland',
       category: null,
       network: Network.ETHEREUM,
-      chainId: ChainId.ETHEREUM_ROPSTEN
+      chainId: ChainId.ETHEREUM_MAINNET
     },
     {
       name: ContractName.MANA,
@@ -94,7 +123,31 @@ const contracts = ({
     },
     {
       name: ContractName.MARKETPLACE,
+      address: getContract(CN.MarketplaceV2, ChainId.MATIC_MAINNET).address,
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MAINNET
+    },
+    {
+      name: ContractName.LEGACY_MARKETPLACE,
       address: getContract(CN.Marketplace, ChainId.MATIC_MAINNET).address,
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MAINNET
+    },
+    {
+      name: CN.CollectionStore,
+      address: getContract(CN.CollectionStore, ChainId.MATIC_MAINNET).address,
+      vendor: 'decentraland',
+      category: null,
+      network: Network.MATIC,
+      chainId: ChainId.MATIC_MAINNET
+    },
+    {
+      name: ContractName.BIDS,
+      address: getContract(CN.BidV2, ChainId.MATIC_MAINNET).address,
       vendor: 'decentraland',
       category: null,
       network: Network.MATIC,

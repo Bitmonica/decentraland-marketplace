@@ -1,16 +1,23 @@
-import { Network, NFT as BaseNFT, Rarity, WearableCategory } from '@dcl/schemas'
+import {
+  Network,
+  NFT as BaseNFT,
+  Order,
+  Rarity,
+  WearableCategory
+} from '@dcl/schemas'
 import { WearableGender } from '../../../nft/wearable/types'
 import { NFT } from '../../../nft/types'
-import { Order } from '../../../order/types'
 import { VendorName } from '../../types'
 
 export type NFTsFetchFilters = {
   isLand?: boolean
   isWearableHead?: boolean
   isWearableAccessory?: boolean
+  isWearableSmart?: boolean
+  rarities?: Rarity[]
   wearableCategory?: WearableCategory
-  wearableRarities?: Rarity[]
   wearableGenders?: WearableGender[]
+  itemId?: string
   contracts?: string[]
   network?: Network
 }

@@ -8,6 +8,11 @@ import {
 import { FETCH_AUTHORIZATIONS_REQUEST } from 'decentraland-dapps/dist/modules/authorization/actions'
 
 import { RootState } from '../../modules/reducer'
+import {
+  isUserCanceled,
+  isUserDeniedSignatureError,
+  isContractAccountError
+} from '../../modules/transaction/utils'
 import { isLoadingType } from 'decentraland-dapps/dist/modules/loading/selectors'
 import { getWallet, isConnecting } from '../../modules/wallet/selectors'
 import {
@@ -22,7 +27,12 @@ const mapState = (state: RootState): MapStateProps => {
 
   const error = getError(state)
 
-  const hasError = !!error && !error.includes('denied transaction signature')
+  // TODO: Change this to use ErrorCodes. Needs an overhaul on decentraland-dapps
+  const hasError =
+    !!error &&
+    !isUserCanceled(error) &&
+    !isUserDeniedSignatureError(error) &&
+    !isContractAccountError(error)
 
   return {
     wallet,

@@ -1,5 +1,4 @@
 import { put, call, takeEvery, select } from 'redux-saga/effects'
-import { push } from 'connected-react-router'
 import {
   CREATE_ORDER_REQUEST,
   CreateOrderRequestAction,
@@ -15,7 +14,6 @@ import {
   cancelOrderFailure
 } from './actions'
 import { getWallet } from '../wallet/selectors'
-import { locations } from '../routing/locations'
 import { VendorFactory } from '../vendor/VendorFactory'
 
 export function* orderSaga() {
@@ -34,9 +32,10 @@ function* handleCreateOrderRequest(action: CreateOrderRequestAction) {
       orderService.create(wallet, nft, price, expiresAt)
     )
     yield put(createOrderSuccess(nft, price, expiresAt, txHash))
-    yield put(push(locations.activity()))
   } catch (error) {
-    yield put(createOrderFailure(nft, price, expiresAt, error.message))
+    yield put(
+      createOrderFailure(nft, price, expiresAt, error.message, error.code)
+    )
   }
 }
 
@@ -57,9 +56,8 @@ function* handleExecuteOrderRequest(action: ExecuteOrderRequestAction) {
     )
 
     yield put(executeOrderSuccess(order, nft, txHash))
-    yield put(push(locations.activity()))
   } catch (error) {
-    yield put(executeOrderFailure(order, nft, error.message))
+    yield put(executeOrderFailure(order, nft, error.message, error.code))
   }
 }
 
@@ -75,10 +73,9 @@ function* handleCancelOrderRequest(action: CancelOrderRequestAction) {
     const { orderService } = VendorFactory.build(nft.vendor)
 
     const wallet: ReturnType<typeof getWallet> = yield select(getWallet)
-    const txHash: string = yield call(() => orderService.cancel(wallet, nft))
+    const txHash: string = yield call(() => orderService.cancel(wallet, order))
     yield put(cancelOrderSuccess(order, nft, txHash))
-    yield put(push(locations.activity()))
   } catch (error) {
-    yield put(cancelOrderFailure(order, nft, error.message))
+    yield put(cancelOrderFailure(order, nft, error.message, error.code))
   }
 }

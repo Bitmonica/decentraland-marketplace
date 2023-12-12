@@ -1,5 +1,6 @@
 import { takeEvery, all, put } from 'redux-saga/effects'
 import { Network, NFTCategory } from '@dcl/schemas'
+import { ContractName } from 'decentraland-transactions'
 import { createWalletSaga } from 'decentraland-dapps/dist/modules/wallet/sagas'
 import {
   ConnectWalletSuccessAction,
@@ -14,15 +15,16 @@ import {
   Authorization,
   AuthorizationType
 } from 'decentraland-dapps/dist/modules/authorization/types'
-
 import { getContractNames } from '../vendor'
 import { contracts, getContract } from '../contract/utils'
 import { isPartner } from '../vendor/utils'
-import { ContractName } from 'decentraland-transactions'
+import { TRANSACTIONS_API_URL } from './utils'
+import { config } from '../../config'
 
 const baseWalletSaga = createWalletSaga({
-  CHAIN_ID: +(process.env.REACT_APP_CHAIN_ID || 1),
-  POLL_INTERVAL: 0
+  CHAIN_ID: Number(config.get('CHAIN_ID')!),
+  POLL_INTERVAL: 0,
+  TRANSACTIONS_API_URL
 })
 
 export function* walletSaga() {
@@ -52,12 +54,23 @@ function* handleWallet(
     network: Network.MATIC
   })
 
+  const legacyMarketplaceMatic = getContract({
+    name: contractNames.LEGACY_MARKETPLACE,
+    network: Network.MATIC
+  })
+
   const marketplaceAdapter = getContract({
     name: contractNames.MARKETPLACE_ADAPTER
   })
 
-  const bids = getContract({
-    name: contractNames.BIDS
+  const bidsEthereum = getContract({
+    name: contractNames.BIDS,
+    network: Network.ETHEREUM
+  })
+
+  const bidsMatic = getContract({
+    name: contractNames.BIDS,
+    network: Network.MATIC
   })
 
   const manaEthereum = getContract({
@@ -67,6 +80,11 @@ function* handleWallet(
 
   const manaMatic = getContract({
     name: contractNames.MANA,
+    network: Network.MATIC
+  })
+
+  const collectionStore = getContract({
+    name: contractNames.COLLECTION_STORE,
     network: Network.MATIC
   })
 
@@ -92,6 +110,15 @@ function* handleWallet(
 
   authorizations.push({
     address,
+    authorizedAddress: legacyMarketplaceMatic.address,
+    contractAddress: manaMatic.address,
+    contractName: ContractName.MANAToken,
+    chainId: manaMatic.chainId,
+    type: AuthorizationType.ALLOWANCE
+  })
+
+  authorizations.push({
+    address,
     authorizedAddress: marketplaceAdapter.address,
     contractAddress: manaEthereum.address,
     contractName: ContractName.MANAToken,
@@ -101,10 +128,28 @@ function* handleWallet(
 
   authorizations.push({
     address,
-    authorizedAddress: bids.address,
+    authorizedAddress: bidsEthereum.address,
     contractAddress: manaEthereum.address,
     contractName: ContractName.MANAToken,
     chainId: manaEthereum.chainId,
+    type: AuthorizationType.ALLOWANCE
+  })
+
+  authorizations.push({
+    address,
+    authorizedAddress: bidsMatic.address,
+    contractAddress: manaMatic.address,
+    contractName: ContractName.MANAToken,
+    chainId: manaMatic.chainId,
+    type: AuthorizationType.ALLOWANCE
+  })
+
+  authorizations.push({
+    address,
+    authorizedAddress: collectionStore.address,
+    contractAddress: manaMatic.address,
+    contractName: ContractName.MANAToken,
+    chainId: manaMatic.chainId,
     type: AuthorizationType.ALLOWANCE
   })
 
